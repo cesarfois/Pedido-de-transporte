@@ -1,0 +1,93 @@
+name: Production Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-push-prod:
+    # if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build dynamic version
+        id: get_version
+        run: |
+          BASE_VERSION=$(jq -r '.version' package.json)
+          VERSION="${BASE_VERSION}.${GITHUB_RUN_NUMBER}.${GITHUB_RUN_ATTEMPT}"
+          echo "BASE_VERSION=$BASE_VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "Using dynamic version: $VERSION"
+
+      - name: Check if Tag Already Exists
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = process.env.VERSION;
+            const tagName = `prod-${version}`;
+            
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tagName}`
+              });
+              
+              core.setFailed(`Tag ${tagName} already exists. Aborting to avoid duplicate release tag.`);
+            } catch (e) {
+              if (e.status !== 404) {
+                throw e;
+              }
+              console.log(`Tag ${tagName} is available.`);
+            }
+
+      - name: Create and Push Git Tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git tag prod-$VERSION
+          git push origin prod-$VERSION
+
+      - name: Deploy to Contabo VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: 22
+          script: |
+            # Garantir que o diretório pai existe
+            mkdir -p /app
+            
+            # Se a pasta não existir ou não for um repositório git, clona
+            if [ ! -d "/app/faturacao-de-servicos/.git" ]; then
+              echo "Pasta não existe ou não é um repositório Git. Clonando..."
+              rm -rf /app/faturacao-de-servicos
+              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/cesarfois/Factura-ao-de-Servi-os.git /app/faturacao-de-servicos
+            fi
+            
+            cd /app/faturacao-de-servicos
+            
+            # Atualizar URL com token temporário para permitir o fetch
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/cesarfois/Factura-ao-de-Servi-os.git
+            
+            # Resetar alterações locais para evitar conflitos no pull
+            git fetch origin main
+            git reset --hard origin/main
+            
+            # Copiar arquivo .env do container original para herdar credenciais e configurações
+            if [ -f "/app/pedido-de-pagamento/.env" ]; then
+              cp /app/pedido-de-pagamento/.env /app/faturacao-de-servicos/.env
+            fi
+            
+            # Build e restart dos containers via docker-compose
+            docker compose down || true
+            docker compose up -d --build

@@ -1,0 +1,153 @@
+import axios from 'axios';
+
+const api = axios.create({
+    // Use relative path - Vite proxy will forward /DocuWare/* to the DocuWare server
+    baseURL: '/DocuWare/Platform',
+    timeout: 30000,
+    headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+    }
+});
+
+// Add request interceptor to include auth token from session storage
+api.interceptors.request.use(
+    (config) => {
+        const authData = sessionStorage.getItem('docuware_auth');
+        let targetUrl = null;
+
+        if (authData) {
+            try {
+                const parsed = JSON.parse(authData);
+                if (parsed.token) {
+                    config.headers.Authorization = `Bearer ${parsed.token}`;
+                }
+                if (parsed.url) {
+                    targetUrl = parsed.url;
+                }
+            } catch (error) {
+                console.error('Error parsing auth data:', error);
+            }
+        }
+
+        // Allow overriding target URL via config (useful for login/discovery)
+        if (config.headers['x-target-url']) {
+            targetUrl = config.headers['x-target-url'];
+        }
+
+        // Apply header if we have a target
+        if (targetUrl) {
+            config.headers['x-target-url'] = targetUrl;
+        }
+
+        return config;
+    },
+    (error) => {
+        return Promise.reject(error);
+    }
+);
+
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+    failedQueue.forEach((prom) => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+// Add response interceptor to handle 401 and session-expired 500 errors
+api.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+        const originalRequest = error.config;
+
+        // Detect both 401 (token expired) and 500 from missing x-target-url (session lost)
+        const is401 = error.response?.status === 401;
+        const isSessionExpired500 = error.response?.status === 500 &&
+            error.response?.data?.error?.includes?.('X-Target-URL');
+
+        if ((is401 || isSessionExpired500) && !originalRequest._retry) {
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                })
+                    .then((token) => {
+                        originalRequest.headers['Authorization'] = `Bearer ${token}`;
+                        // Re-read auth data to restore x-target-url (may have been missing)
+                        const authData = sessionStorage.getItem('docuware_auth');
+                        if (authData) {
+                            try {
+                                const parsed = JSON.parse(authData);
+                                if (parsed.url) originalRequest.headers['x-target-url'] = parsed.url;
+                            } catch (_) { }
+                        }
+                        return api(originalRequest);
+                    })
+                    .catch((err) => {
+                        return Promise.reject(err);
+                    });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            console.warn('[api.js] Session error detected. Attempting token refresh...');
+            return new Promise((resolve, reject) => {
+                (async () => {
+                    try {
+                        // Dynamically import to avoid circular dependency
+                        const { authService } = await import('./authService.js');
+                        const newToken = await authService.refreshToken();
+                        originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+
+                        // Re-read auth data to restore x-target-url (may have been missing)
+                        const authData = sessionStorage.getItem('docuware_auth');
+                        if (authData) {
+                            try {
+                                const parsed = JSON.parse(authData);
+                                if (parsed.url) originalRequest.headers['x-target-url'] = parsed.url;
+                            } catch (_) { }
+                        }
+
+                        processQueue(null, newToken);
+                        resolve(api(originalRequest));
+                    } catch (refreshError) {
+                        if (window.location.pathname.startsWith('/workflow-diagram')) {
+                            console.warn('[api.js] Falha ao atualizar. Tentando re-autenticar conta de serviço...');
+                            try {
+                                const { authService } = await import('./authService.js');
+                                const saAuth = await authService.loginWithServiceAccount();
+                                originalRequest.headers['Authorization'] = `Bearer ${saAuth.token}`;
+                                originalRequest.headers['x-target-url'] = saAuth.url;
+                                processQueue(null, saAuth.token);
+                                resolve(api(originalRequest));
+                                return;
+                            } catch (saErr) {
+                                console.error('[api.js] Falha crítica na conta de serviço:', saErr);
+                                processQueue(saErr, null);
+                                reject(saErr);
+                                return;
+                            }
+                        }
+                        console.error('[api.js] Token refresh failed. Redirecting to login.');
+                        processQueue(refreshError, null);
+                        window.location.href = '/login';
+                        reject(refreshError);
+                    } finally {
+                        isRefreshing = false;
+                    }
+                })();
+            });
+        }
+
+        return Promise.reject(error);
+    }
+);
+
+export default api;
