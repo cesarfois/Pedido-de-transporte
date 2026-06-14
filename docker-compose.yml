@@ -14,7 +14,7 @@ services:
         - DOCUWARE_ORG_ID=${DOCUWARE_ORG_ID}
     container_name: rcsvision-faturacao-app
     ports:
-      - "3006:3001"
+      - "3007:3001"
     volumes:
       - ./exports:/app/exports
     environment:
