@@ -300,6 +300,60 @@ const getDocumentProject = (doc) => {
     return '';
 };
 
+const getDocumentRequerente = (doc) => {
+    if (!doc) return '';
+    return getDocFieldValue(doc, 'REQUERENTE') || getDocFieldValue(doc, 'SOLICITANTE') || getDocFieldValue(doc, 'USER') || '';
+};
+
+const getDocumentDataActividade = (doc) => {
+    if (!doc) return '';
+    const fieldsToTry = [
+        'DATA_ACTIVIDADE',
+        'DATA_ATIVIDADE',
+        'DATA_DA_ACTIVIDADE',
+        'DATA_DA_ATIVIDADE',
+        'DATA',
+        'DATE'
+    ];
+    for (const f of fieldsToTry) {
+        const val = getDocFieldValue(doc, f);
+        if (val) return val;
+    }
+    return '';
+};
+
+const getDocumentHoraPartida = (doc) => {
+    if (!doc) return '';
+    const fieldsToTry = [
+        'HORA_PARTIDA',
+        'HORA_DE_PARTIDA',
+        'HORAPARTIDA',
+        'PARTIDA',
+        'DEPARTURE_TIME'
+    ];
+    for (const f of fieldsToTry) {
+        const val = getDocFieldValue(doc, f);
+        if (val) return val;
+    }
+    return '';
+};
+
+const getDocumentHoraRegresso = (doc) => {
+    if (!doc) return '';
+    const fieldsToTry = [
+        'HORA_REGRESSO',
+        'HORA_DE_REGRESSO',
+        'HORAREGRESSO',
+        'REGRESSO',
+        'RETURN_TIME'
+    ];
+    for (const f of fieldsToTry) {
+        const val = getDocFieldValue(doc, f);
+        if (val) return val;
+    }
+    return '';
+};
+
 const getDocumentValor = (doc) => {
     if (!doc) return '';
     return getDocFieldValue(doc, 'CHAMP_10') || getDocFieldValue(doc, 'VALOR_TOTAL') || getDocFieldValue(doc, 'MATRICULA') || '';
@@ -381,17 +435,19 @@ const WorkflowHistoryPage = () => {
         docNum: [],
         activeTaskName: [],
         responsible: [],
-        codEmpresa: [],
-        encPrimavera: [],
-        unidadeNegocio: []
+        requerente: [],
+        dataActividade: [],
+        horaPartida: [],
+        horaRegresso: []
     });
     const [columnSearchQueries, setColumnSearchQueries] = useState({
         docNum: '',
         activeTaskName: '',
         responsible: '',
-        codEmpresa: '',
-        encPrimavera: '',
-        unidadeNegocio: ''
+        requerente: '',
+        dataActividade: '',
+        horaPartida: '',
+        horaRegresso: ''
     });
     
     // Document Grid / List States
@@ -720,9 +776,10 @@ const WorkflowHistoryPage = () => {
             if (columnFilters.docNum && columnFilters.docNum.length > 0 && !columnFilters.docNum.includes(getDocumentProject(doc) || 'Sem Número de Pedido')) return false;
             if (columnFilters.activeTaskName && columnFilters.activeTaskName.length > 0 && !columnFilters.activeTaskName.includes(prog.activeTaskName || '-')) return false;
             if (columnFilters.responsible && columnFilters.responsible.length > 0 && !columnFilters.responsible.includes(prog.responsible || '-')) return false;
-            if (columnFilters.codEmpresa && columnFilters.codEmpresa.length > 0 && !columnFilters.codEmpresa.includes(getDocFieldValue(doc, 'CODIGO_DE_EMPRESA') || '-')) return false;
-            if (columnFilters.encPrimavera && columnFilters.encPrimavera.length > 0 && !columnFilters.encPrimavera.includes(getDocFieldValue(doc, 'NO_PRIMAVERA_ENC_CLIENTE') || '-')) return false;
-            if (columnFilters.unidadeNegocio && columnFilters.unidadeNegocio.length > 0 && !columnFilters.unidadeNegocio.includes(getDocFieldValue(doc, 'UNIDADE_DE_NEG_CIO') || '-')) return false;
+            if (columnFilters.requerente && columnFilters.requerente.length > 0 && !columnFilters.requerente.includes(getDocumentRequerente(doc) || '-')) return false;
+            if (columnFilters.dataActividade && columnFilters.dataActividade.length > 0 && !columnFilters.dataActividade.includes(formatDate(getDocumentDataActividade(doc), true) || '-')) return false;
+            if (columnFilters.horaPartida && columnFilters.horaPartida.length > 0 && !columnFilters.horaPartida.includes(getDocumentHoraPartida(doc) || '-')) return false;
+            if (columnFilters.horaRegresso && columnFilters.horaRegresso.length > 0 && !columnFilters.horaRegresso.includes(getDocumentHoraRegresso(doc) || '-')) return false;
 
             return true;
         });
@@ -780,15 +837,15 @@ const WorkflowHistoryPage = () => {
                 };
                 valA = getVal(a);
                 valB = getVal(b);
-            } else if (sortField === 'encPrimavera') {
-                valA = getDocFieldValue(a, 'NO_PRIMAVERA_ENC_CLIENTE') || '';
-                valB = getDocFieldValue(b, 'NO_PRIMAVERA_ENC_CLIENTE') || '';
-            } else if (sortField === 'unidadeNegocio') {
-                valA = getDocFieldValue(a, 'UNIDADE_DE_NEG_CIO') || '';
-                valB = getDocFieldValue(b, 'UNIDADE_DE_NEG_CIO') || '';
-            } else if (sortField === 'codEmpresa') {
-                valA = getDocFieldValue(a, 'CODIGO_DE_EMPRESA') || '';
-                valB = getDocFieldValue(b, 'CODIGO_DE_EMPRESA') || '';
+            } else if (sortField === 'dataActividade') {
+                valA = getDocumentDataActividade(a) || '';
+                valB = getDocumentDataActividade(b) || '';
+            } else if (sortField === 'horaPartida') {
+                valA = getDocumentHoraPartida(a) || '';
+                valB = getDocumentHoraPartida(b) || '';
+            } else if (sortField === 'horaRegresso') {
+                valA = getDocumentHoraRegresso(a) || '';
+                valB = getDocumentHoraRegresso(b) || '';
             } else {
                 return 0;
             }
@@ -818,12 +875,14 @@ const WorkflowHistoryPage = () => {
                 if (prog) vals.add(prog.activeTaskName || '-');
             } else if (field === 'responsible') {
                 if (prog) vals.add(prog.responsible || '-');
-            } else if (field === 'codEmpresa') {
-                vals.add(getDocFieldValue(doc, 'CODIGO_DE_EMPRESA') || '-');
-            } else if (field === 'encPrimavera') {
-                vals.add(getDocFieldValue(doc, 'NO_PRIMAVERA_ENC_CLIENTE') || '-');
-            } else if (field === 'unidadeNegocio') {
-                vals.add(getDocFieldValue(doc, 'UNIDADE_DE_NEG_CIO') || '-');
+            } else if (field === 'requerente') {
+                vals.add(getDocumentRequerente(doc) || '-');
+            } else if (field === 'dataActividade') {
+                vals.add(formatDate(getDocumentDataActividade(doc), true) || '-');
+            } else if (field === 'horaPartida') {
+                vals.add(getDocumentHoraPartida(doc) || '-');
+            } else if (field === 'horaRegresso') {
+                vals.add(getDocumentHoraRegresso(doc) || '-');
             }
         });
         return Array.from(vals).filter(v => v !== undefined && v !== null && v !== '').sort((a, b) => 
@@ -1403,17 +1462,19 @@ const WorkflowHistoryPage = () => {
             docNum: [],
             activeTaskName: [],
             responsible: [],
-            codEmpresa: [],
-            encPrimavera: [],
-            unidadeNegocio: []
+            requerente: [],
+            dataActividade: [],
+            horaPartida: [],
+            horaRegresso: []
         });
         setColumnSearchQueries({
             docNum: '',
             activeTaskName: '',
             responsible: '',
-            codEmpresa: '',
-            encPrimavera: '',
-            unidadeNegocio: ''
+            requerente: '',
+            dataActividade: '',
+            horaPartida: '',
+            horaRegresso: ''
         });
 
         try {
@@ -2264,6 +2325,186 @@ const WorkflowHistoryPage = () => {
                                                     Tempo Parado {sortField === 'timeStoppedMs' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}
                                                 </th>
 
+                                                {/* Requerente */}
+                                                <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('requerente')}>
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <span>Requerente {sortField === 'requerente' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <div className="dropdown dropdown-bottom dropdown-end" onClick={(e) => e.stopPropagation()}>
+                                                            <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
+                                                                <FaFilter className={`text-[9px] ${columnFilters.requerente.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
+                                                            </label>
+                                                            <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
+                                                                <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
+                                                                    <span>Filtrar Requerente</span>
+                                                                    {columnFilters.requerente.length > 0 && (
+                                                                        <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('requerente')}>Limpar</button>
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Buscar..."
+                                                                    className="input input-xs input-bordered w-full mb-2 bg-white text-slate-800 text-[11px] font-normal"
+                                                                    value={columnSearchQueries.requerente}
+                                                                    onChange={(e) => setColumnSearchQueries(prev => ({ ...prev, requerente: e.target.value }))}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                                <div className="max-h-48 overflow-y-auto w-full">
+                                                                    {getUniqueColumnValues('requerente')
+                                                                        .filter(val => String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(
+                                                                            (columnSearchQueries.requerente || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                                                                        ))
+                                                                        .map(val => (
+                                                                            <label key={val} className="flex items-center gap-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer px-1">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="checkbox checkbox-xs checkbox-primary"
+                                                                                    checked={columnFilters.requerente.includes(val)}
+                                                                                    onChange={() => handleToggleColumnFilter('requerente', val)}
+                                                                                />
+                                                                                <span className="truncate">{val}</span>
+                                                                            </label>
+                                                                        ))}
+                                                                </div>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </th>
+
+                                                {/* Data Actividade */}
+                                                <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('dataActividade')}>
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <span>Data Actividade {sortField === 'dataActividade' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <div className="dropdown dropdown-bottom dropdown-end" onClick={(e) => e.stopPropagation()}>
+                                                            <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
+                                                                <FaFilter className={`text-[9px] ${columnFilters.dataActividade.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
+                                                            </label>
+                                                            <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
+                                                                <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
+                                                                    <span>Filtrar Data Actividade</span>
+                                                                    {columnFilters.dataActividade.length > 0 && (
+                                                                        <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('dataActividade')}>Limpar</button>
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Buscar..."
+                                                                    className="input input-xs input-bordered w-full mb-2 bg-white text-slate-800 text-[11px] font-normal"
+                                                                    value={columnSearchQueries.dataActividade}
+                                                                    onChange={(e) => setColumnSearchQueries(prev => ({ ...prev, dataActividade: e.target.value }))}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                                <div className="max-h-48 overflow-y-auto w-full">
+                                                                    {getUniqueColumnValues('dataActividade')
+                                                                        .filter(val => String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(
+                                                                            (columnSearchQueries.dataActividade || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                                                                        ))
+                                                                        .map(val => (
+                                                                            <label key={val} className="flex items-center gap-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer px-1">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="checkbox checkbox-xs checkbox-primary"
+                                                                                    checked={columnFilters.dataActividade.includes(val)}
+                                                                                    onChange={() => handleToggleColumnFilter('dataActividade', val)}
+                                                                                />
+                                                                                <span className="truncate">{val}</span>
+                                                                            </label>
+                                                                        ))}
+                                                                </div>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </th>
+
+                                                {/* Hora Partida */}
+                                                <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('horaPartida')}>
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <span>Hora Partida {sortField === 'horaPartida' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <div className="dropdown dropdown-bottom dropdown-end" onClick={(e) => e.stopPropagation()}>
+                                                            <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
+                                                                <FaFilter className={`text-[9px] ${columnFilters.horaPartida.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
+                                                            </label>
+                                                            <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
+                                                                <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
+                                                                    <span>Filtrar Hora Partida</span>
+                                                                    {columnFilters.horaPartida.length > 0 && (
+                                                                        <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('horaPartida')}>Limpar</button>
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Buscar..."
+                                                                    className="input input-xs input-bordered w-full mb-2 bg-white text-slate-800 text-[11px] font-normal"
+                                                                    value={columnSearchQueries.horaPartida}
+                                                                    onChange={(e) => setColumnSearchQueries(prev => ({ ...prev, horaPartida: e.target.value }))}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                                <div className="max-h-48 overflow-y-auto w-full">
+                                                                    {getUniqueColumnValues('horaPartida')
+                                                                        .filter(val => String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(
+                                                                            (columnSearchQueries.horaPartida || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                                                                        ))
+                                                                        .map(val => (
+                                                                            <label key={val} className="flex items-center gap-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer px-1">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="checkbox checkbox-xs checkbox-primary"
+                                                                                    checked={columnFilters.horaPartida.includes(val)}
+                                                                                    onChange={() => handleToggleColumnFilter('horaPartida', val)}
+                                                                                />
+                                                                                <span className="truncate">{val}</span>
+                                                                            </label>
+                                                                        ))}
+                                                                </div>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </th>
+
+                                                {/* Hora de Regresso */}
+                                                <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('horaRegresso')}>
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <span>Hora de Regresso {sortField === 'horaRegresso' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <div className="dropdown dropdown-bottom dropdown-end" onClick={(e) => e.stopPropagation()}>
+                                                            <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
+                                                                <FaFilter className={`text-[9px] ${columnFilters.horaRegresso.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
+                                                            </label>
+                                                            <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
+                                                                <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
+                                                                    <span>Filtrar Hora de Regresso</span>
+                                                                    {columnFilters.horaRegresso.length > 0 && (
+                                                                        <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('horaRegresso')}>Limpar</button>
+                                                                    )}
+                                                                </div>
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="Buscar..."
+                                                                    className="input input-xs input-bordered w-full mb-2 bg-white text-slate-800 text-[11px] font-normal"
+                                                                    value={columnSearchQueries.horaRegresso}
+                                                                    onChange={(e) => setColumnSearchQueries(prev => ({ ...prev, horaRegresso: e.target.value }))}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                />
+                                                                <div className="max-h-48 overflow-y-auto w-full">
+                                                                    {getUniqueColumnValues('horaRegresso')
+                                                                        .filter(val => String(val).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(
+                                                                            (columnSearchQueries.horaRegresso || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                                                                        ))
+                                                                        .map(val => (
+                                                                            <label key={val} className="flex items-center gap-2 py-1.5 hover:bg-slate-50 rounded cursor-pointer px-1">
+                                                                                <input
+                                                                                    type="checkbox"
+                                                                                    className="checkbox checkbox-xs checkbox-primary"
+                                                                                    checked={columnFilters.horaRegresso.includes(val)}
+                                                                                    onChange={() => handleToggleColumnFilter('horaRegresso', val)}
+                                                                                />
+                                                                                <span className="truncate">{val}</span>
+                                                                            </label>
+                                                                        ))}
+                                                                </div>
+                                                            </ul>
+                                                        </div>
+                                                    </div>
+                                                </th>
+
 
                                                 <th className="py-3 px-1 text-center w-[38px]" title="Histórico">
                                                     <FaHistory className="mx-auto text-slate-400" />
@@ -2360,20 +2601,40 @@ const WorkflowHistoryPage = () => {
                                                         </td>
 
                                                         {/* Time Stopped */}
-                                                         <td className="py-3 px-2">
-                                                             {isProgLoading ? (
-                                                                 <span className="inline-block w-12 h-3 bg-slate-100 animate-pulse rounded"></span>
-                                                             ) : !prog.isFinished && prog.timeStoppedMs > 0 ? (
-                                                                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                                     isDelayed 
-                                                                         ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' 
-                                                                         : 'bg-slate-100 text-slate-600'
-                                                                 }`}>
-                                                                     <FaClock className="text-[9px]" />
-                                                                     {WorkflowHistoryAnalyzer.formatDuration(prog.timeStoppedMs)}
-                                                                 </span>
-                                                             ) : '-'}
-                                                         </td>
+                                                        <td className="py-3 px-2">
+                                                            {isProgLoading ? (
+                                                                <span className="inline-block w-12 h-3 bg-slate-100 animate-pulse rounded"></span>
+                                                            ) : !prog.isFinished && prog.timeStoppedMs > 0 ? (
+                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                                                    isDelayed 
+                                                                        ? 'bg-rose-50 text-rose-600 border border-rose-100 animate-pulse' 
+                                                                        : 'bg-slate-100 text-slate-600'
+                                                                }`}>
+                                                                    <FaClock className="text-[9px]" />
+                                                                    {WorkflowHistoryAnalyzer.formatDuration(prog.timeStoppedMs)}
+                                                                </span>
+                                                            ) : '-'}
+                                                        </td>
+
+                                                        {/* Requerente */}
+                                                        <td className="py-3 px-2 text-slate-600 text-xs truncate max-w-[120px]" title={getDocumentRequerente(doc) || '-'}>
+                                                            {getDocumentRequerente(doc) || '-'}
+                                                        </td>
+
+                                                        {/* Data Actividade */}
+                                                        <td className="py-3 px-2 text-slate-600 text-xs truncate max-w-[120px]">
+                                                            {formatDate(getDocumentDataActividade(doc), true) || '-'}
+                                                        </td>
+
+                                                        {/* Hora Partida */}
+                                                        <td className="py-3 px-2 text-slate-600 text-xs truncate max-w-[100px]">
+                                                            {getDocumentHoraPartida(doc) || '-'}
+                                                        </td>
+
+                                                        {/* Hora Regresso */}
+                                                        <td className="py-3 px-2 text-slate-600 text-xs truncate max-w-[100px]">
+                                                            {getDocumentHoraRegresso(doc) || '-'}
+                                                        </td>
 
                                                         {/* History */}
                                                         <td className="py-3 px-0.5 text-center w-[38px]">
