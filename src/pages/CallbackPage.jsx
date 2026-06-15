@@ -58,7 +58,7 @@ const CallbackPage = () => {
                         sessionStorage.removeItem('redirect_after_login');
                         window.location.href = redirectPath;
                     } else {
-                        window.location.href = '/faturacao-de-servicos';
+                        window.location.href = '/pedido-de-transporte';
                     }
                 }, 500);
 
