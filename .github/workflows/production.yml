@@ -68,16 +68,16 @@ jobs:
             mkdir -p /app
             
             # Se a pasta não existir ou não for um repositório git, clona
-            if [ ! -d "/app/faturacao-de-servicos/.git" ]; then
+            if [ ! -d "/app/pedido-de-transporte/.git" ]; then
               echo "Pasta não existe ou não é um repositório Git. Clonando..."
-              rm -rf /app/faturacao-de-servicos
-              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/cesarfois/Factura-ao-de-Servi-os.git /app/faturacao-de-servicos
+              rm -rf /app/pedido-de-transporte
+              git clone https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/cesarfois/Pedido-de-transporte.git /app/pedido-de-transporte
             fi
             
-            cd /app/faturacao-de-servicos
+            cd /app/pedido-de-transporte
             
             # Atualizar URL com token temporário para permitir o fetch
-            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/cesarfois/Factura-ao-de-Servi-os.git
+            git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/cesarfois/Pedido-de-transporte.git
             
             # Resetar alterações locais para evitar conflitos no pull
             git fetch origin main
@@ -85,7 +85,7 @@ jobs:
             
             # Copiar arquivo .env do container original para herdar credenciais e configurações
             if [ -f "/app/pedido-de-pagamento/.env" ]; then
-              cp /app/pedido-de-pagamento/.env /app/faturacao-de-servicos/.env
+              cp /app/pedido-de-pagamento/.env /app/pedido-de-transporte/.env
             fi
             
             # Build e restart dos containers via docker-compose
