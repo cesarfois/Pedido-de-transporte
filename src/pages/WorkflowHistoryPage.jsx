@@ -284,6 +284,10 @@ const getDocumentNumber = (doc) => {
 const getDocumentProject = (doc) => {
     if (!doc) return '';
     const fieldsToTry = [
+        'N_PEDIDO',
+        'NO_PEDIDO___REFERENCIA',
+        'NO_PEDIDO',
+        'NUMERO_PEDIDO',
         'PROJECTO',
         'PROJETO',
         'PROJECT',
@@ -713,7 +717,7 @@ const WorkflowHistoryPage = () => {
             if (filterResponsible !== 'all' && prog.responsible !== filterResponsible && !(prog.responsible && prog.responsible.includes(filterResponsible))) return false;
 
             // Excel-like Column Filters
-            if (columnFilters.docNum && columnFilters.docNum.length > 0 && !columnFilters.docNum.includes(getDocumentProject(doc) || 'Sem Projeto')) return false;
+            if (columnFilters.docNum && columnFilters.docNum.length > 0 && !columnFilters.docNum.includes(getDocumentProject(doc) || 'Sem Número de Pedido')) return false;
             if (columnFilters.activeTaskName && columnFilters.activeTaskName.length > 0 && !columnFilters.activeTaskName.includes(prog.activeTaskName || '-')) return false;
             if (columnFilters.responsible && columnFilters.responsible.length > 0 && !columnFilters.responsible.includes(prog.responsible || '-')) return false;
             if (columnFilters.codEmpresa && columnFilters.codEmpresa.length > 0 && !columnFilters.codEmpresa.includes(getDocFieldValue(doc, 'CODIGO_DE_EMPRESA') || '-')) return false;
@@ -809,7 +813,7 @@ const WorkflowHistoryPage = () => {
         documents.forEach(doc => {
             const prog = documentProgress[doc.Id];
             if (field === 'docNum') {
-                vals.add(getDocumentProject(doc) || 'Sem Projeto');
+                vals.add(getDocumentProject(doc) || 'Sem Número de Pedido');
             } else if (field === 'activeTaskName') {
                 if (prog) vals.add(prog.activeTaskName || '-');
             } else if (field === 'responsible') {
@@ -1775,7 +1779,7 @@ const WorkflowHistoryPage = () => {
     const handleExportDocumentsList = () => {
         try {
             const csvHeaders = [
-                'Projeto',
+                'Número de Pedido',
                 'ID DocuWare',
                 'Início',
                 'Status',
@@ -1792,7 +1796,7 @@ const WorkflowHistoryPage = () => {
 
             const rows = filteredAndSortedDocuments.map(doc => {
                 const prog = documentProgress[doc.Id] || {};
-                const docNum = getDocumentProject(doc) || 'Sem Projeto';
+                const docNum = getDocumentProject(doc) || 'Sem Número de Pedido';
                 const comments = getDocumentComments(doc) || '';
                 const timeStopped = !prog.isFinished && prog.timeStoppedMs > 0
                     ? WorkflowHistoryAnalyzer.formatDuration(prog.timeStoppedMs)
@@ -2122,14 +2126,14 @@ const WorkflowHistoryPage = () => {
                                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
                                                 <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('docNum')}>
                                                     <div className="flex items-center justify-between gap-1">
-                                                        <span>Projeto {sortField === 'docNum' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <span>Número de Pedido {sortField === 'docNum' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
                                                         <div className="dropdown dropdown-bottom" onClick={(e) => e.stopPropagation()}>
                                                             <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
                                                                 <FaFilter className={`text-[9px] ${columnFilters.docNum.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
                                                             </label>
                                                             <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
                                                                 <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
-                                                                    <span>Filtrar Projeto</span>
+                                                                    <span>Filtrar Número de Pedido</span>
                                                                     {columnFilters.docNum.length > 0 && (
                                                                         <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('docNum')}>Limpar</button>
                                                                     )}
@@ -2278,7 +2282,7 @@ const WorkflowHistoryPage = () => {
                                                 const prog = documentProgress[doc.Id];
                                                 const isProgLoading = !prog;
 
-                                                const docNum = getDocumentProject(doc) || 'Sem Projeto';
+                                                const docNum = getDocumentProject(doc) || 'Sem Número de Pedido';
                                                 const isDelayed = prog && !prog.isFinished && (prog.timeStoppedMs > 24 * 60 * 60 * 1000);
 
                                                 return (
