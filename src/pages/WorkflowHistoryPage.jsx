@@ -1840,7 +1840,7 @@ const WorkflowHistoryPage = () => {
     const handleExportDocumentsList = () => {
         try {
             const csvHeaders = [
-                'Número de Pedido',
+                'Pedido',
                 'ID DocuWare',
                 'Início',
                 'Status',
@@ -1864,7 +1864,7 @@ const WorkflowHistoryPage = () => {
                     : '';
 
                 return {
-                    'Documento': docNum,
+                    'Pedido': docNum,
                     'ID DocuWare': doc.Id,
                     'Início': prog.entryDate ? formatDate(prog.entryDate, true) : '',
                     'Status': prog.isFinished ? 'Concluído' : (prog.percent !== undefined ? 'Ativo' : 'Carregando...'),
@@ -2187,14 +2187,14 @@ const WorkflowHistoryPage = () => {
                                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
                                                 <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('docNum')}>
                                                     <div className="flex items-center justify-between gap-1">
-                                                        <span>Número de Pedido {sortField === 'docNum' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <span>Pedido {sortField === 'docNum' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
                                                         <div className="dropdown dropdown-bottom" onClick={(e) => e.stopPropagation()}>
                                                             <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
                                                                 <FaFilter className={`text-[9px] ${columnFilters.docNum.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
                                                             </label>
                                                             <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
                                                                 <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
-                                                                    <span>Filtrar Número de Pedido</span>
+                                                                    <span>Filtrar Pedido</span>
                                                                     {columnFilters.docNum.length > 0 && (
                                                                         <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('docNum')}>Limpar</button>
                                                                     )}
@@ -2415,17 +2415,17 @@ const WorkflowHistoryPage = () => {
                                                     </div>
                                                 </th>
 
-                                                {/* Hora Partida */}
+                                                    {/* Hora Partida */}
                                                 <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('horaPartida')}>
                                                     <div className="flex items-center justify-between gap-1">
-                                                        <span>Hora Partida {sortField === 'horaPartida' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <span>Partida {sortField === 'horaPartida' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
                                                         <div className="dropdown dropdown-bottom dropdown-end" onClick={(e) => e.stopPropagation()}>
                                                             <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
                                                                 <FaFilter className={`text-[9px] ${columnFilters.horaPartida.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
                                                             </label>
                                                             <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
                                                                 <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
-                                                                    <span>Filtrar Hora Partida</span>
+                                                                    <span>Filtrar Partida</span>
                                                                     {columnFilters.horaPartida.length > 0 && (
                                                                         <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('horaPartida')}>Limpar</button>
                                                                     )}
@@ -2459,18 +2459,18 @@ const WorkflowHistoryPage = () => {
                                                         </div>
                                                     </div>
                                                 </th>
-
+ 
                                                 {/* Hora de Regresso */}
                                                 <th className="py-3 px-2 text-left cursor-pointer hover:bg-slate-100 select-none transition-colors" onClick={() => handleSort('horaRegresso')}>
                                                     <div className="flex items-center justify-between gap-1">
-                                                        <span>Hora de Regresso {sortField === 'horaRegresso' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
+                                                        <span>Regresso {sortField === 'horaRegresso' ? (sortDirection === 'asc' ? '↑' : '↓') : '↕'}</span>
                                                         <div className="dropdown dropdown-bottom dropdown-end" onClick={(e) => e.stopPropagation()}>
                                                             <label tabIndex={0} className="btn btn-ghost btn-xs px-1 hover:bg-slate-200/60 rounded">
                                                                 <FaFilter className={`text-[9px] ${columnFilters.horaRegresso.length > 0 ? 'text-indigo-600 font-bold' : 'text-slate-400'}`} />
                                                             </label>
                                                             <ul tabIndex={0} className="dropdown-content menu p-3 shadow-lg bg-white border border-slate-200 rounded-xl w-60 z-[100] text-xs normal-case font-normal text-slate-700">
                                                                 <div className="font-bold text-slate-500 mb-2 border-b pb-1 flex justify-between items-center">
-                                                                    <span>Filtrar Hora de Regresso</span>
+                                                                    <span>Filtrar Regresso</span>
                                                                     {columnFilters.horaRegresso.length > 0 && (
                                                                         <button className="text-[10px] text-indigo-600 hover:underline" onClick={() => handleClearColumnFilter('horaRegresso')}>Limpar</button>
                                                                     )}
