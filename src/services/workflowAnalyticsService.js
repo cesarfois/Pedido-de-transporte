@@ -205,9 +205,16 @@ export const workflowAnalyticsService = {
     /**
      * Get Workflow WFD definition from backend server
      */
-    getWfdDefinition: async (workflowId) => {
+    getWfdDefinition: async (workflowId, workflowName = '') => {
         try {
-            const response = await analyticsApi.get(`/api/wfd/${workflowId}`, { baseURL: '/' });
+            const params = {};
+            if (workflowName) {
+                params.name = workflowName;
+            }
+            const response = await analyticsApi.get(`/api/wfd/${workflowId}`, { 
+                baseURL: '/',
+                params
+            });
             return response.data;
         } catch (err) {
             console.warn(`[WorkflowAnalytics] WFD not found on server for ${workflowId}:`, err.message);
