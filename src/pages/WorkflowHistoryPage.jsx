@@ -411,6 +411,10 @@ const WorkflowHistoryPage = () => {
     const [typeSuggestions, setTypeSuggestions] = useState([]);
     const [selectedDocType, setSelectedDocType] = useState('Pedido de Transporte');
     
+    // Pagination States
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(50);
+    
     // Date filter range state (default to 30 days ago to today)
     const getTodayString = () => new Date().toISOString().split('T')[0];
     const getThirtyDaysAgoString = () => {
@@ -473,6 +477,11 @@ const WorkflowHistoryPage = () => {
     const [isDiagramMaximized, setIsDiagramMaximized] = useState(false);
     const [error, setError] = useState(null);
     const [searched, setSearched] = useState(false);
+
+    // Reset pagination to page 1 when any search, filter, or sort changes
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [quickFilter, filterStep, filterResponsible, columnFilters, sortField, sortDirection]);
 
     // Load Cabinets & Org ID on mount, supporting deep-linking from DocuWare tasks
     useEffect(() => {
@@ -660,38 +669,62 @@ const WorkflowHistoryPage = () => {
 
         documents.forEach(doc => {
             const prog = documentProgress[doc.Id];
-            if (prog) {
-                if (prog.isFinished) {
-                    if (prog.isRejected) {
-                        rejected++;
-                    } else {
-                        completed++;
+            
+            // Fallback status detection using document index fields
+            const estado = (getDocFieldValue(doc, 'ESTADO') || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            const estatuto1 = (getDocFieldValue(doc, 'ESTATUTO1') || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            
+            const indexIsFinished = estado === 'concluido' || estatuto1 === 'concluido' || estatuto1 === 'cancelado' || estatuto1 === 'recusado' || estado === 'concluído';
+            const indexIsRejected = estatuto1 === 'cancelado' || estatuto1 === 'recusado';
+
+            const isDocFinished = prog ? prog.isFinished : indexIsFinished;
+            const isDocRejected = prog ? prog.isRejected : indexIsRejected;
+
+            if (isDocFinished) {
+                if (isDocRejected) {
+                    rejected++;
+                } else {
+                    completed++;
+                }
+                if (prog && prog.completedAt && prog.entryDate) {
+                    const duration = new Date(prog.completedAt).getTime() - new Date(prog.entryDate).getTime();
+                    if (duration > 0) {
+                        completedDurationsSum += duration;
+                        completedDurationsCount++;
                     }
-                    if (prog.completedAt && prog.entryDate) {
-                        const duration = new Date(prog.completedAt).getTime() - new Date(prog.entryDate).getTime();
-                        if (duration > 0) {
-                            completedDurationsSum += duration;
-                            completedDurationsCount++;
+                }
+            } else {
+                active++;
+                
+                let isDelayed = false;
+                if (prog) {
+                    isDelayed = prog.timeStoppedMs > 24 * 60 * 60 * 1000;
+                } else {
+                    const dataAct = getDocumentDataActividade(doc);
+                    if (dataAct) {
+                        const actDate = new Date(dataAct);
+                        if (!isNaN(actDate.getTime())) {
+                            const timeDiff = Date.now() - actDate.getTime();
+                            isDelayed = timeDiff > 24 * 60 * 60 * 1000;
                         }
                     }
-                } else {
-                    active++;
-                    
-                    const isDelayed = prog.timeStoppedMs > 24 * 60 * 60 * 1000;
-                    if (isDelayed) {
-                        delayed++;
-                    }
-
-                    if (prog.activeTaskName) {
-                        stepTimeSum[prog.activeTaskName] = (stepTimeSum[prog.activeTaskName] || 0) + (prog.timeStoppedMs || 0);
-                        stepTimeCount[prog.activeTaskName] = (stepTimeCount[prog.activeTaskName] || 0) + 1;
-                    }
+                }
+                if (isDelayed) {
+                    delayed++;
                 }
 
-                if (prog.percent !== undefined && !isNaN(prog.percent)) {
-                    totalPercent += prog.percent;
-                    percentCount++;
+                if (prog && prog.activeTaskName) {
+                    stepTimeSum[prog.activeTaskName] = (stepTimeSum[prog.activeTaskName] || 0) + (prog.timeStoppedMs || 0);
+                    stepTimeCount[prog.activeTaskName] = (stepTimeCount[prog.activeTaskName] || 0) + 1;
                 }
+            }
+
+            if (prog && prog.percent !== undefined && !isNaN(prog.percent)) {
+                totalPercent += prog.percent;
+                percentCount++;
+            } else {
+                totalPercent += indexIsFinished ? 100 : 10;
+                percentCount++;
             }
         });
 
@@ -864,6 +897,12 @@ const WorkflowHistoryPage = () => {
         return result;
     }, [documents, documentProgress, quickFilter, filterStep, filterResponsible, sortField, sortDirection, columnFilters]);
 
+    // Paginated slice of documents
+    const paginatedDocs = useMemo(() => {
+        const startIndex = (currentPage - 1) * pageSize;
+        return filteredAndSortedDocuments.slice(startIndex, startIndex + pageSize);
+    }, [filteredAndSortedDocuments, currentPage, pageSize]);
+
     // Helpers to manage Excel-like column filters
     const getUniqueColumnValues = (field) => {
         const vals = new Set();
@@ -998,313 +1037,326 @@ const WorkflowHistoryPage = () => {
         let active = true;
         
         const fetchProgressForDocs = async () => {
-            const docsToFetch = [...documents];
-            const batchSize = 35;
+            // Prioritize page-visible documents, and slow-fetch everything else.
+            const visibleDocs = [...paginatedDocs];
+            const visibleSet = new Set(visibleDocs.map(d => d.Id));
+            const otherDocs = filteredAndSortedDocuments.filter(d => !visibleSet.has(d.Id));
 
             // Ensure global cache object exists
             window._historyCache = window._historyCache || {};
 
-            for (let i = 0; i < docsToFetch.length; i += batchSize) {
+            // 1. Fetch visible docs with batchSize 5
+            const visibleBatchSize = 5;
+            for (let i = 0; i < visibleDocs.length; i += visibleBatchSize) {
                 if (!active) break;
-
-                const batch = docsToFetch.slice(i, i + batchSize);
-                
+                const batch = visibleDocs.slice(i, i + visibleBatchSize);
                 await Promise.all(batch.map(async (doc) => {
-                    try {
-                        if (documentProgress[doc.Id]) return;
+                    await fetchSingleDocProgress(doc);
+                }));
+            }
 
-                        const cacheKey = `wf_history_${selectedCabinet}_${doc.Id}`;
-                        let instances = null;
+            // 2. Fetch other docs with batchSize 3 and 300ms sleep in between
+            const backgroundBatchSize = 3;
+            for (let i = 0; i < otherDocs.length; i += backgroundBatchSize) {
+                if (!active) break;
+                const batch = otherDocs.slice(i, i + backgroundBatchSize);
+                await Promise.all(batch.map(async (doc) => {
+                    await fetchSingleDocProgress(doc);
+                }));
+                // Sleep for 300ms to avoid overloading DocuWare API
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+        };
 
+        const fetchSingleDocProgress = async (doc) => {
+            try {
+                if (documentProgress[doc.Id]) return;
+
+                const cacheKey = `wf_history_${selectedCabinet}_${doc.Id}`;
+                let instances = null;
+
+                try {
+                    const cached = sessionStorage.getItem(cacheKey);
+                    if (cached) {
+                        const parsed = JSON.parse(cached);
+                        const isExpired = parsed.expiresAt && Date.now() > parsed.expiresAt;
+                        if (!isExpired) {
+                            instances = parsed.instances;
+                        }
+                    }
+                } catch (e) {
+                    console.error('Failed to read from sessionStorage', e);
+                }
+
+                if (!instances) {
+                    instances = window._historyCache[cacheKey];
+                }
+
+                if (!instances) {
+                    instances = await workflowAnalyticsService.getHistoryByDocId(doc.Id, selectedCabinet);
+                    window._historyCache[cacheKey] = instances;
+                }
+                
+                if (!active) return;
+
+                let percent = 0;
+                let remaining = 0;
+                let statusText = 'Pendente';
+                let activeTaskName = '';
+                let isFinished = false;
+                let isRejected = false;
+                let entryDate = null;
+                let completedAt = null;
+                let responsible = '-';
+                let timeStoppedMs = 0;
+                let nextStep = '-';
+                let merged = null;
+                let analyzedHistory = [];
+
+                if (instances && instances.length > 0) {
+                    const sorted = [...instances].sort((a, b) => {
+                        return (b.Version || 0) - (a.Version || 0);
+                    });
+                    
+                    const instance = sorted[0];
+                    const rawHistory = instance.HistorySteps || [];
+                    analyzedHistory = WorkflowHistoryAnalyzer.analyze(rawHistory);
+
+                    let parsedDef = wfdDefinitions[instance.WorkflowId];
+                    if (!parsedDef) {
+                        window._wfdPromises = window._wfdPromises || {};
+                        if (!window._wfdPromises[instance.WorkflowId]) {
+                            window._wfdPromises[instance.WorkflowId] = (async () => {
+                                let def = await workflowAnalyticsService.getWfdDefinition(instance.WorkflowId, instance.WorkflowName || instance.Name);
+                                if (!def) {
+                                    const savedWfdStr = localStorage.getItem(`wfd_def_${instance.WorkflowId}`);
+                                    if (savedWfdStr) {
+                                        try {
+                                            def = JSON.parse(savedWfdStr);
+                                        } catch (err) {
+                                            console.error('[WorkflowHistory] Failed to parse stored WFD:', err);
+                                        }
+                                    }
+                                }
+                                return def;
+                            })();
+                        }
+                        parsedDef = await window._wfdPromises[instance.WorkflowId];
+                    }
+
+                    if (!parsedDef) {
+                        parsedDef = generateFallbackGraph(analyzedHistory);
+                    }
+
+                    const graph = WorkflowGraphBuilder.build(parsedDef.activities, parsedDef.connections);
+                    merged = WorkflowTimelineEngine.merge(graph, analyzedHistory);
+
+                    const nodes = merged.nodes || [];
+                    const edges = merged.edges || [];
+                    
+                    const isEndNode = (n) => {
+                        if (!n) return false;
+                        const type = (n.type || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                        const name = (n.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                        const hasOutgoing = edges.some(e => e.source === n.id);
+                        
+                        if (!hasOutgoing) return true;
+                        
+                        if (type.includes('condition') || type.includes('condicao') || type.includes('decision') || 
+                            type.includes('assignment') || type.includes('atribuir') || type.includes('webservice') || 
+                            type.includes('email') || type.includes('mail') || type.includes('notification')) {
+                            return false;
+                        }
+                        
+                        if (type.includes('end') || type.includes('fim')) return true;
+                        
+                        return name === 'end' || 
+                               name.startsWith('end ') || 
+                               name.endsWith(' end') || 
+                               name.includes(' end ') ||
+                               name.startsWith('fim') || 
+                               name.includes(' fim') ||
+                               name.includes('concluid') || 
+                               name.includes('termin') || 
+                               name.includes('conclusao') ||
+                               name === 'reprovado' || name === 'reprovada' ||
+                               name === 'cancelado' || name === 'cancelada' || 
+                               name === 'recusado' || name === 'recusada';
+                    };
+                    
+                    const endNode = nodes.find(isEndNode);
+                    isFinished = endNode && endNode.status === 'completed';
+
+                    // Detect rejection/cancellation
+                    if (isFinished) {
+                        const rejKw = ['recusad', 'cancelad', 'reprovad', 'rejeit', 'refused', 'reject'];
+                        const normalize = (s) => (s || '').toLowerCase()
+                            .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+                        isRejected = analyzedHistory.some(step => {
+                            const dec = normalize(step.decision || '');
+                            return rejKw.some(kw => dec.includes(kw));
+                        });
+                    }
+
+                    const parseDWDate = (dateStr) => {
+                        if (!dateStr) return null;
+                        if (typeof dateStr === 'string' && dateStr.startsWith('/Date(')) {
+                            const match = dateStr.match(/-?\d+/);
+                            if (match) {
+                                const ts = parseInt(match[0]);
+                                return ts > 0 ? new Date(ts) : null;
+                            }
+                        }
+                        const d = new Date(dateStr);
+                        return isNaN(d.getTime()) ? null : d;
+                    };
+
+                    entryDate = instance ? (instance.StartedAt ? parseDWDate(instance.StartedAt) : (analyzedHistory[0]?.startedAt || null)) : null;
+                    completedAt = isFinished && endNode ? (endNode.executions[0]?.completedAt || endNode.completedAt || null) : null;
+
+                    const activeNode = nodes.find(n => n.status === 'active');
+                    if (activeNode) {
+                        if (activeNode.activeUsers && activeNode.activeUsers.length > 0) {
+                            responsible = activeNode.activeUsers.join(', ');
+                        } else if (activeNode.executions && activeNode.executions.length > 0) {
+                            responsible = activeNode.executions[activeNode.executions.length - 1].user || 'Sistema';
+                        }
+                    }
+
+                    if (!isFinished && activeNode) {
+                        const activeStep = analyzedHistory.find(step => step.isActive || (!step.decision && step.name === activeNode.name));
+                        const activeStart = activeStep ? activeStep.startedAt : (activeNode.executions[0]?.startedAt || null);
+                        if (activeStart) {
+                            timeStoppedMs = Math.max(0, new Date().getTime() - new Date(activeStart).getTime());
+                        }
+                    }
+
+                    const getNextStepName = (nodes, edges, activeNode) => {
+                        if (!activeNode) return '-';
+                        const outgoing = edges.filter(e => e.source === activeNode.id);
+                        if (outgoing.length === 0) return 'Fim';
+                        const targetNames = outgoing.map(edge => {
+                            const targetNode = nodes.find(n => n.id === edge.target);
+                            const label = edge.label ? ` (${edge.label})` : '';
+                            return targetNode ? `${targetNode.name}${label}` : '';
+                        }).filter(Boolean);
+                        return targetNames.join(' / ') || 'Fim';
+                    };
+                    nextStep = getNextStepName(nodes, edges, activeNode);
+
+                    if (isFinished) {
+                        percent = 100;
+                        remaining = 0;
+                        statusText = 'Concluído';
+                    } else {
+                        if (activeNode) {
+                            activeTaskName = activeNode.name;
+                            remaining = getRemainingTaskCount(nodes, edges, activeNode.id) || 1;
+                            
+                            const completed = nodes.filter(n => n.status === 'completed' && isTaskType(n.type)).length;
+                            const total = completed + remaining;
+                            percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+                            
+                            if (percent >= 100) percent = 99;
+                            statusText = `Em Andamento (${percent}%)`;
+                        } else {
+                             const startNode = nodes.find(n => {
+                                 const type = (n.type || '').toLowerCase();
+                                 const name = (n.name || '').toLowerCase();
+                                 return type.includes('start') || name.includes('start') || name.includes('inicio') || name.includes('início');
+                             });
+                            if (startNode) {
+                                remaining = getRemainingTaskCount(nodes, edges, startNode.id);
+                                percent = 0;
+                                statusText = 'Pendente';
+                            } else {
+                                percent = 0;
+                                statusText = 'Em Processamento';
+                            }
+                        }
+                    } // Close the else block of isFinished
+                    if (instances) {
                         try {
-                            const cached = sessionStorage.getItem(cacheKey);
-                            if (cached) {
-                                const parsed = JSON.parse(cached);
-                                const isExpired = parsed.expiresAt && Date.now() > parsed.expiresAt;
-                                if (!isExpired) {
-                                    instances = parsed.instances;
+                            const expiresAt = isFinished ? null : Date.now() + 5 * 60 * 1000;
+                            const payload = JSON.stringify({
+                                instances,
+                                expiresAt,
+                                isFinished
+                            });
+                            try {
+                                sessionStorage.setItem(cacheKey, payload);
+                            } catch (err) {
+                                if (err.name === 'QuotaExceededError' || err.code === 22) {
+                                    console.warn('[Cache] SessionStorage full. Evicting old workflow history items...');
+                                    const keys = [];
+                                    for (let idx = 0; idx < sessionStorage.length; idx++) {
+                                        const k = sessionStorage.key(idx);
+                                        if (k && k.startsWith('wf_history_')) {
+                                            keys.push(k);
+                                        }
+                                    }
+                                    keys.forEach(k => sessionStorage.removeItem(k));
+                                    sessionStorage.setItem(cacheKey, payload);
+                                } else {
+                                    throw err;
                                 }
                             }
                         } catch (e) {
-                            console.error('Failed to read from sessionStorage', e);
-                        }
-
-                        if (!instances) {
-                            instances = window._historyCache[cacheKey];
-                        }
-
-                        if (!instances) {
-                            instances = await workflowAnalyticsService.getHistoryByDocId(doc.Id, selectedCabinet);
-                            window._historyCache[cacheKey] = instances;
-                        }
-                        
-                        if (!active) return;
-
-                        let percent = 0;
-                        let remaining = 0;
-                        let statusText = 'Pendente';
-                        let activeTaskName = '';
-                        let isFinished = false;
-                        let isRejected = false;
-                        let entryDate = null;
-                        let completedAt = null;
-                        let responsible = '-';
-                        let timeStoppedMs = 0;
-                        let nextStep = '-';
-                        let merged = null;
-                        let analyzedHistory = [];
-
-                        if (instances && instances.length > 0) {
-                            const sorted = [...instances].sort((a, b) => {
-                                return (b.Version || 0) - (a.Version || 0);
-                            });
-                            
-                            const instance = sorted[0];
-                            const rawHistory = instance.HistorySteps || [];
-                            analyzedHistory = WorkflowHistoryAnalyzer.analyze(rawHistory);
-
-                            let parsedDef = wfdDefinitions[instance.WorkflowId];
-                            if (!parsedDef) {
-                                window._wfdPromises = window._wfdPromises || {};
-                                if (!window._wfdPromises[instance.WorkflowId]) {
-                                    window._wfdPromises[instance.WorkflowId] = (async () => {
-                                        let def = await workflowAnalyticsService.getWfdDefinition(instance.WorkflowId, instance.WorkflowName || instance.Name);
-                                        if (!def) {
-                                            const savedWfdStr = localStorage.getItem(`wfd_def_${instance.WorkflowId}`);
-                                            if (savedWfdStr) {
-                                                try {
-                                                    def = JSON.parse(savedWfdStr);
-                                                } catch (err) {
-                                                    console.error('[WorkflowHistory] Failed to parse stored WFD:', err);
-                                                }
-                                            }
-                                        }
-                                        return def;
-                                    })();
-                                }
-                                parsedDef = await window._wfdPromises[instance.WorkflowId];
-                            }
-
-                            if (!parsedDef) {
-                                parsedDef = generateFallbackGraph(analyzedHistory);
-                            }
-
-                            const graph = WorkflowGraphBuilder.build(parsedDef.activities, parsedDef.connections);
-                            merged = WorkflowTimelineEngine.merge(graph, analyzedHistory);
-
-                            const nodes = merged.nodes || [];
-                            const edges = merged.edges || [];
-                            
-                            const isEndNode = (n) => {
-                                if (!n) return false;
-                                const type = (n.type || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-                                const name = (n.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-                                const hasOutgoing = edges.some(e => e.source === n.id);
-                                
-                                if (!hasOutgoing) return true;
-                                
-                                if (type.includes('condition') || type.includes('condicao') || type.includes('decision') || 
-                                    type.includes('assignment') || type.includes('atribuir') || type.includes('webservice') || 
-                                    type.includes('email') || type.includes('mail') || type.includes('notification')) {
-                                    return false;
-                                }
-                                
-                                if (type.includes('end') || type.includes('fim')) return true;
-                                
-                                return name === 'end' || 
-                                       name.startsWith('end ') || 
-                                       name.endsWith(' end') || 
-                                       name.includes(' end ') ||
-                                       name.startsWith('fim') || 
-                                       name.includes(' fim') ||
-                                       name.includes('concluid') || 
-                                       name.includes('termin') || 
-                                       name.includes('conclusao') ||
-                                       name === 'reprovado' || name === 'reprovada' ||
-                                       name === 'cancelado' || name === 'cancelada' || 
-                                       name === 'recusado' || name === 'recusada';
-                            };
-                            
-                            const endNode = nodes.find(isEndNode);
-                            isFinished = endNode && endNode.status === 'completed';
-
-                            // Detect rejection/cancellation: check if any decision taken
-                            // in the history contains a rejection/cancellation keyword.
-                            // The End node is always "Final" (neutral), so we must look at
-                            // the decisions, not the terminal node name.
-                            if (isFinished) {
-                                const rejKw = ['recusad', 'cancelad', 'reprovad', 'rejeit', 'refused', 'reject'];
-                                const normalize = (s) => (s || '').toLowerCase()
-                                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-                                isRejected = analyzedHistory.some(step => {
-                                    const dec = normalize(step.decision || '');
-                                    return rejKw.some(kw => dec.includes(kw));
-                                });
-                            }
-
-                            const parseDWDate = (dateStr) => {
-                                if (!dateStr) return null;
-                                if (typeof dateStr === 'string' && dateStr.startsWith('/Date(')) {
-                                    const match = dateStr.match(/-?\d+/);
-                                    if (match) {
-                                        const ts = parseInt(match[0]);
-                                        return ts > 0 ? new Date(ts) : null;
-                                    }
-                                }
-                                const d = new Date(dateStr);
-                                return isNaN(d.getTime()) ? null : d;
-                            };
-
-                            entryDate = instance ? (instance.StartedAt ? parseDWDate(instance.StartedAt) : (analyzedHistory[0]?.startedAt || null)) : null;
-                            completedAt = isFinished && endNode ? (endNode.executions[0]?.completedAt || endNode.completedAt || null) : null;
-
-                            const activeNode = nodes.find(n => n.status === 'active');
-                            if (activeNode) {
-                                if (activeNode.activeUsers && activeNode.activeUsers.length > 0) {
-                                    responsible = activeNode.activeUsers.join(', ');
-                                } else if (activeNode.executions && activeNode.executions.length > 0) {
-                                    responsible = activeNode.executions[activeNode.executions.length - 1].user || 'Sistema';
-                                }
-                            }
-
-                            if (!isFinished && activeNode) {
-                                const activeStep = analyzedHistory.find(step => step.isActive || (!step.decision && step.name === activeNode.name));
-                                const activeStart = activeStep ? activeStep.startedAt : (activeNode.executions[0]?.startedAt || null);
-                                if (activeStart) {
-                                    timeStoppedMs = Math.max(0, new Date().getTime() - new Date(activeStart).getTime());
-                                }
-                            }
-
-                            const getNextStepName = (nodes, edges, activeNode) => {
-                                if (!activeNode) return '-';
-                                const outgoing = edges.filter(e => e.source === activeNode.id);
-                                if (outgoing.length === 0) return 'Fim';
-                                const targetNames = outgoing.map(edge => {
-                                    const targetNode = nodes.find(n => n.id === edge.target);
-                                    const label = edge.label ? ` (${edge.label})` : '';
-                                    return targetNode ? `${targetNode.name}${label}` : '';
-                                }).filter(Boolean);
-                                return targetNames.join(' / ') || 'Fim';
-                            };
-                            nextStep = getNextStepName(nodes, edges, activeNode);
-
-                            if (isFinished) {
-                                percent = 100;
-                                remaining = 0;
-                                statusText = 'Concluído';
-                            } else {
-                                if (activeNode) {
-                                    activeTaskName = activeNode.name;
-                                    remaining = getRemainingTaskCount(nodes, edges, activeNode.id) || 1;
-                                    
-                                    const completed = nodes.filter(n => n.status === 'completed' && isTaskType(n.type)).length;
-                                    const total = completed + remaining;
-                                    percent = total > 0 ? Math.round((completed / total) * 100) : 0;
-                                    
-                                    if (percent >= 100) percent = 99;
-                                    statusText = `Em Andamento (${percent}%)`;
-                                } else {
-                                     const startNode = nodes.find(n => {
-                                         const type = (n.type || '').toLowerCase();
-                                         const name = (n.name || '').toLowerCase();
-                                         return type.includes('start') || name.includes('start') || name.includes('inicio') || name.includes('início');
-                                     });
-                                    if (startNode) {
-                                        remaining = getRemainingTaskCount(nodes, edges, startNode.id);
-                                        percent = 0;
-                                        statusText = 'Pendente';
-                                    } else {
-                                        percent = 0;
-                                        statusText = 'Em Processamento';
-                                    }
-                                }
-                            } // Close the else block of isFinished
-                            if (instances) {
-                                try {
-                                    const expiresAt = isFinished ? null : Date.now() + 5 * 60 * 1000;
-                                    const payload = JSON.stringify({
-                                        instances,
-                                        expiresAt,
-                                        isFinished
-                                    });
-                                    try {
-                                        sessionStorage.setItem(cacheKey, payload);
-                                    } catch (err) {
-                                        if (err.name === 'QuotaExceededError' || err.code === 22) {
-                                            console.warn('[Cache] SessionStorage full. Evicting old workflow history items...');
-                                            const keys = [];
-                                            for (let idx = 0; idx < sessionStorage.length; idx++) {
-                                                const k = sessionStorage.key(idx);
-                                                if (k && k.startsWith('wf_history_')) {
-                                                    keys.push(k);
-                                                }
-                                            }
-                                            keys.forEach(k => sessionStorage.removeItem(k));
-                                            sessionStorage.setItem(cacheKey, payload);
-                                        } else {
-                                            throw err;
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.warn('Failed to write to sessionStorage', e);
-                                }
-                            }
-                        } // Close the instances && instances.length > 0 block
-
-                        if (active) {
-                            setDocumentProgress(prev => ({
-                                ...prev,
-                                [doc.Id]: {
-                                    percent,
-                                    remaining,
-                                    statusText,
-                                    activeTaskName,
-                                    isFinished,
-                                    isRejected,
-                                    loading: false,
-                                    entryDate,
-                                    completedAt,
-                                    responsible,
-                                    timeStoppedMs,
-                                    nextStep,
-                                    mergedGraph: merged,
-                                    analyzedHistory,
-                                    instances
-                                }
-                            }));
-
-                            // If this document is completed, persist its history details in cache
-                            if (isFinished && instances && instances.length > 0) {
-                                workflowAnalyticsService.persistHistoryCache(doc.Id, instances);
-                            }
-                        }
-                    } catch (err) {
-                        console.error(`Failed to calculate progress for doc ${doc.Id}:`, err);
-                        if (active) {
-                            setDocumentProgress(prev => ({
-                                ...prev,
-                                [doc.Id]: {
-                                    percent: 0,
-                                    remaining: 0,
-                                    statusText: 'Sem Fluxo',
-                                    activeTaskName: '',
-                                    isFinished: false,
-                                    loading: false,
-                                    entryDate: null,
-                                    completedAt: null,
-                                    responsible: '-',
-                                    timeStoppedMs: 0,
-                                    nextStep: '-',
-                                    mergedGraph: null,
-                                    analyzedHistory: [],
-                                    instances: []
-                                }
-                            }));
+                            console.warn('Failed to write to sessionStorage', e);
                         }
                     }
-                }));
+                } // Close the instances && instances.length > 0 block
 
-                await new Promise(resolve => setTimeout(resolve, 10));
+                if (active) {
+                    setDocumentProgress(prev => ({
+                        ...prev,
+                        [doc.Id]: {
+                            percent,
+                            remaining,
+                            statusText,
+                            activeTaskName,
+                            isFinished,
+                            isRejected,
+                            loading: false,
+                            entryDate,
+                            completedAt,
+                            responsible,
+                            timeStoppedMs,
+                            nextStep,
+                            mergedGraph: merged,
+                            analyzedHistory,
+                            instances
+                        }
+                    }));
+
+                    // If this document is completed, persist its history details in cache
+                    if (isFinished && instances && instances.length > 0) {
+                        workflowAnalyticsService.persistHistoryCache(doc.Id, instances);
+                    }
+                }
+            } catch (err) {
+                console.error(`Failed to calculate progress for doc ${doc.Id}:`, err);
+                if (active) {
+                    setDocumentProgress(prev => ({
+                        ...prev,
+                        [doc.Id]: {
+                            percent: 0,
+                            remaining: 0,
+                            statusText: 'Sem Fluxo',
+                            activeTaskName: '',
+                            isFinished: false,
+                            loading: false,
+                            entryDate: null,
+                            completedAt: null,
+                            responsible: '-',
+                            timeStoppedMs: 0,
+                            nextStep: '-',
+                            mergedGraph: null,
+                            analyzedHistory: [],
+                            instances: []
+                        }
+                    }));
+                }
             }
         };
 
@@ -1313,7 +1365,7 @@ const WorkflowHistoryPage = () => {
         return () => {
             active = false;
         };
-    }, [documents, wfdUpdateCounter]);
+    }, [documents, currentPage, pageSize, wfdUpdateCounter]);
 
     const handleWfdUpload = async (e, workflowId) => {
         const file = e.target.files[0];
@@ -2518,7 +2570,7 @@ const WorkflowHistoryPage = () => {
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-100">
-                                            {filteredAndSortedDocuments.map((doc) => {
+                                            {paginatedDocs.map((doc) => {
                                                 const isSelected = selectedDoc && selectedDoc.Id === doc.Id;
                                                 const prog = documentProgress[doc.Id];
                                                 const isProgLoading = !prog;
@@ -2684,6 +2736,77 @@ const WorkflowHistoryPage = () => {
                                     </table>
                                 )}
                             </div>
+
+                            {/* Pagination Controls */}
+                            {filteredAndSortedDocuments.length > pageSize && (
+                                <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-t border-slate-200 text-xs font-semibold text-slate-500 shrink-0">
+                                    <div>
+                                        Mostrando <span className="text-slate-800 font-extrabold">{Math.min(filteredAndSortedDocuments.length, (currentPage - 1) * pageSize + 1)}</span> a{' '}
+                                        <span className="text-slate-800 font-extrabold">{Math.min(filteredAndSortedDocuments.length, currentPage * pageSize)}</span> de{' '}
+                                        <span className="text-slate-800 font-extrabold">{filteredAndSortedDocuments.length}</span> documentos
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCurrentPage(1)}
+                                            disabled={currentPage === 1}
+                                            className="btn btn-xs btn-outline border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200"
+                                        >
+                                            Primeira
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                            disabled={currentPage === 1}
+                                            className="btn btn-xs btn-outline border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200"
+                                        >
+                                            Anterior
+                                        </button>
+                                        
+                                        {/* Page numbers */}
+                                        {(() => {
+                                            const totalPages = Math.ceil(filteredAndSortedDocuments.length / pageSize);
+                                            const startPage = Math.max(1, currentPage - 2);
+                                            const endPage = Math.min(totalPages, startPage + 4);
+                                            const pages = [];
+                                            for (let p = startPage; p <= endPage; p++) {
+                                                pages.push(p);
+                                            }
+                                            return pages.map(p => (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    onClick={() => setCurrentPage(p)}
+                                                    className={`btn btn-xs min-w-[28px] ${
+                                                        currentPage === p 
+                                                            ? 'btn-primary text-white font-extrabold shadow-sm' 
+                                                            : 'btn-outline border-slate-300 hover:bg-slate-100 hover:text-slate-800'
+                                                    }`}
+                                                >
+                                                    {p}
+                                                </button>
+                                            ));
+                                        })()}
+
+                                        <button
+                                            type="button"
+                                            onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredAndSortedDocuments.length / pageSize), prev + 1))}
+                                            disabled={currentPage === Math.ceil(filteredAndSortedDocuments.length / pageSize)}
+                                            className="btn btn-xs btn-outline border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200"
+                                        >
+                                            Próxima
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCurrentPage(Math.ceil(filteredAndSortedDocuments.length / pageSize))}
+                                            disabled={currentPage === Math.ceil(filteredAndSortedDocuments.length / pageSize)}
+                                            className="btn btn-xs btn-outline border-slate-300 hover:bg-slate-100 hover:text-slate-800 disabled:bg-slate-50 disabled:text-slate-300 disabled:border-slate-200"
+                                        >
+                                            Última
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Right Column (18% width): Pipeline Visual */}
