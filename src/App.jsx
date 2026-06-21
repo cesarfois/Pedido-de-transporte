@@ -7,6 +7,7 @@ import WorkflowHistoryPage from './pages/WorkflowHistoryPage';
 import WorkflowDiagramPage from './pages/WorkflowDiagramPage';
 import DashboardLayout from './components/Layout/DashboardLayout';
 import CallbackPage from './pages/CallbackPage';
+import GraficosPage from './pages/GraficosPage';
 
 // Protected Route Wrapper
 const ProtectedRoute = ({ children }) => {
@@ -47,6 +48,16 @@ function App() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <WorkflowHistoryPage />
+                  </DashboardLayout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/graficos"
+              element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <GraficosPage />
                   </DashboardLayout>
                 </ProtectedRoute>
               }
