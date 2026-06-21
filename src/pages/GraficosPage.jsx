@@ -64,7 +64,7 @@ const GraficosPage = () => {
 
             if (startDate && endDate) {
                 queryFilters.push({
-                    fieldName: 'DWSTOREDATE',
+                    fieldName: 'DATA_PEDIDO',
                     value: [startDate, endDate]
                 });
             }
