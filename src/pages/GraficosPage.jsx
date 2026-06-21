@@ -43,6 +43,7 @@ const GraficosPage = () => {
     const [rawDocs, setRawDocs] = useState([]);
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'timeline'
     const [commentsTab, setCommentsTab] = useState('elogios'); // 'elogios' or 'sugestoes'
+    const [expandedDriver, setExpandedDriver] = useState(null); // name of expanded driver for details
 
     // Historical data states (Lazy loaded)
     const [historicalDocs, setHistoricalDocs] = useState([]);
@@ -245,23 +246,83 @@ const GraficosPage = () => {
             starNum: parseInt(star)
         }));
 
-        // Driver Rankings
+        // Driver Rankings with sub-criteria details (Atraso, Comportamento, Condução, Estado do Veículo)
         const driverGroups = {};
+        let globalAtrasoSum = 0, globalAtrasoCount = 0;
+        let globalComportamentoSum = 0, globalComportamentoCount = 0;
+        let globalConducaoSum = 0, globalConducaoCount = 0;
+        let globalEstadoVeiculoSum = 0, globalEstadoVeiculoCount = 0;
+
         evaluatedRequests.forEach(r => {
             if (r.driver === 'Não Especificado') return;
             if (!driverGroups[r.driver]) {
-                driverGroups[r.driver] = { sum: 0, count: 0 };
+                driverGroups[r.driver] = { 
+                    sum: 0, 
+                    count: 0,
+                    atrasoSum: 0,
+                    atrasoCount: 0,
+                    comportamentoSum: 0,
+                    comportamentoCount: 0,
+                    conducaoSum: 0,
+                    conducaoCount: 0,
+                    estadoVeiculoSum: 0,
+                    estadoVeiculoCount: 0
+                };
             }
             driverGroups[r.driver].sum += r.averageRating;
             driverGroups[r.driver].count++;
+
+            // Accumulate individual criteria
+            if (r.ratings.atraso !== null) {
+                driverGroups[r.driver].atrasoSum += r.ratings.atraso;
+                driverGroups[r.driver].atrasoCount++;
+                globalAtrasoSum += r.ratings.atraso;
+                globalAtrasoCount++;
+            }
+            if (r.ratings.comportamento !== null) {
+                driverGroups[r.driver].comportamentoSum += r.ratings.comportamento;
+                driverGroups[r.driver].comportamentoCount++;
+                globalComportamentoSum += r.ratings.comportamento;
+                globalComportamentoCount++;
+            }
+            if (r.ratings.conducao !== null) {
+                driverGroups[r.driver].conducaoSum += r.ratings.conducao;
+                driverGroups[r.driver].conducaoCount++;
+                globalConducaoSum += r.ratings.conducao;
+                globalConducaoCount++;
+            }
+            if (r.ratings.estadoVeiculo !== null) {
+                driverGroups[r.driver].estadoVeiculoSum += r.ratings.estadoVeiculo;
+                driverGroups[r.driver].estadoVeiculoCount++;
+                globalEstadoVeiculoSum += r.ratings.estadoVeiculo;
+                globalEstadoVeiculoCount++;
+            }
         });
+
         const driverRanking = Object.keys(driverGroups)
-            .map(name => ({
-                name,
-                media: parseFloat((driverGroups[name].sum / driverGroups[name].count).toFixed(2)),
-                count: driverGroups[name].count
-            }))
+            .map(name => {
+                const g = driverGroups[name];
+                return {
+                    name,
+                    media: parseFloat((g.sum / g.count).toFixed(2)),
+                    count: g.count,
+                    criteria: {
+                        atraso: g.atrasoCount > 0 ? parseFloat((g.atrasoSum / g.atrasoCount).toFixed(2)) : null,
+                        comportamento: g.comportamentoCount > 0 ? parseFloat((g.comportamentoSum / g.comportamentoCount).toFixed(2)) : null,
+                        conducao: g.conducaoCount > 0 ? parseFloat((g.conducaoSum / g.conducaoCount).toFixed(2)) : null,
+                        estadoVeiculo: g.estadoVeiculoCount > 0 ? parseFloat((g.estadoVeiculoSum / g.estadoVeiculoCount).toFixed(2)) : null
+                    }
+                };
+            })
             .sort((a, b) => b.media - a.media || b.count - a.count);
+
+        // Global operational pillars averages
+        const pillarsAverages = [
+            { name: 'Pontualidade / Atraso', media: globalAtrasoCount > 0 ? parseFloat((globalAtrasoSum / globalAtrasoCount).toFixed(2)) : 0 },
+            { name: 'Comportamento', media: globalComportamentoCount > 0 ? parseFloat((globalComportamentoSum / globalComportamentoCount).toFixed(2)) : 0 },
+            { name: 'Condução', media: globalConducaoCount > 0 ? parseFloat((globalConducaoSum / globalConducaoCount).toFixed(2)) : 0 },
+            { name: 'Estado do Veículo', media: globalEstadoVeiculoCount > 0 ? parseFloat((globalEstadoVeiculoSum / globalEstadoVeiculoCount).toFixed(2)) : 0 }
+        ];
 
         // Department Rankings
         const deptGroups = {};
@@ -297,7 +358,8 @@ const GraficosPage = () => {
                     comment: r.comment,
                     date: r.date ? r.date.toLocaleDateString('pt-BR') : '-',
                     sentiment,
-                    viewUrl: r.viewUrl
+                    viewUrl: r.viewUrl,
+                    ratings: r.ratings // Pass sub-ratings
                 };
             })
             .sort((a, b) => {
@@ -317,7 +379,8 @@ const GraficosPage = () => {
             distribution,
             driverRanking,
             deptRanking,
-            feedbacks
+            feedbacks,
+            pillarsAverages
         };
     }, [rawDocs]);
 
@@ -542,38 +605,76 @@ const GraficosPage = () => {
                             </div>
                         </div>
 
-                        {/* Distribution Chart */}
-                        <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
-                            <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                                <FaChartBar className="text-indigo-500" />
-                                Distribuição das Avaliações
-                            </h3>
-                            <div className="h-72">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={analyticsData.distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                        <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} />
-                                        <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} />
-                                        <ChartTooltip
-                                            cursor={{ fill: '#f8fafc' }}
-                                            content={({ active, payload }) => {
-                                                if (active && payload && payload.length) {
-                                                    return (
-                                                        <div className="bg-slate-950 text-white text-xs px-3 py-2 rounded-xl shadow-lg border-none font-semibold">
-                                                            {payload[0].payload.name}: {payload[0].value} avaliações
-                                                        </div>
-                                                    );
-                                                }
-                                                return null;
-                                            }}
-                                        />
-                                        <Bar dataKey="quantidade" radius={[6, 6, 0, 0]}>
-                                            {analyticsData.distribution.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={COLORS[entry.starNum - 1] || '#6366f1'} />
-                                            ))}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
+                        {/* Charts Section */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            {/* Distribution Chart */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                                    <FaChartBar className="text-indigo-500" />
+                                    Distribuição das Avaliações
+                                </h3>
+                                <div className="h-72">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={analyticsData.distribution} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis dataKey="name" stroke="#94a3b8" fontSize={12} tickLine={false} />
+                                            <YAxis stroke="#94a3b8" fontSize={12} tickLine={false} />
+                                            <ChartTooltip
+                                                cursor={{ fill: '#f8fafc' }}
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        return (
+                                                            <div className="bg-slate-950 text-white text-xs px-3 py-2 rounded-xl shadow-lg border-none font-semibold">
+                                                                {payload[0].payload.name}: {payload[0].value} avaliações
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar dataKey="quantidade" radius={[6, 6, 0, 0]}>
+                                                {analyticsData.distribution.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[entry.starNum - 1] || '#6366f1'} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+
+                            {/* Pillars Averages Bar Chart */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+                                <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                                    <FaChartBar className="text-indigo-500" />
+                                    Comparativo de Pilares Operacionais (Causa Raiz)
+                                </h3>
+                                <div className="h-72">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={analyticsData.pillarsAverages} layout="vertical" margin={{ top: 10, right: 15, left: 35, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                            <XAxis type="number" domain={[0, 5]} stroke="#94a3b8" fontSize={12} tickLine={false} />
+                                            <YAxis dataKey="name" type="category" stroke="#94a3b8" fontSize={10} tickLine={false} width={120} />
+                                            <ChartTooltip
+                                                cursor={{ fill: '#f8fafc' }}
+                                                content={({ active, payload }) => {
+                                                    if (active && payload && payload.length) {
+                                                        return (
+                                                            <div className="bg-slate-950 text-white text-xs px-3 py-2 rounded-xl shadow-lg border-none font-semibold">
+                                                                {payload[0].payload.name}: {payload[0].value} ★
+                                                            </div>
+                                                        );
+                                                    }
+                                                    return null;
+                                                }}
+                                            />
+                                            <Bar dataKey="media" radius={[0, 6, 6, 0]}>
+                                                {analyticsData.pillarsAverages.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={['#ef4444', '#f97316', '#3b82f6', '#10b981'][index] || '#6366f1'} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
                         </div>
 
@@ -596,19 +697,61 @@ const GraficosPage = () => {
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-700">
                                             {analyticsData.driverRanking.map((row, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                                                    <td className="py-3 font-semibold text-slate-900">{row.name}</td>
-                                                    <td className="py-3 text-center text-slate-500">{row.count}</td>
-                                                    <td className="py-3 text-right font-bold">
-                                                        <span className={`px-2.5 py-1 rounded-lg text-xs ${
-                                                            row.media >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
-                                                            row.media >= 2.8 ? 'bg-amber-50 text-amber-700' :
-                                                            'bg-rose-50 text-rose-700'
-                                                        }`}>
-                                                            {row.media} ★
-                                                        </span>
-                                                    </td>
-                                                </tr>
+                                                <React.Fragment key={idx}>
+                                                    <tr 
+                                                        className="hover:bg-slate-50/50 cursor-pointer transition-colors"
+                                                        onClick={() => setExpandedDriver(expandedDriver === row.name ? null : row.name)}
+                                                    >
+                                                        <td className="py-3 font-semibold text-slate-900 flex items-center gap-2">
+                                                            <span className="text-[10px] text-slate-400">
+                                                                {expandedDriver === row.name ? '▼' : '▶'}
+                                                            </span>
+                                                            {row.name}
+                                                        </td>
+                                                        <td className="py-3 text-center text-slate-500">{row.count}</td>
+                                                        <td className="py-3 text-right font-bold">
+                                                            <span className={`px-2.5 py-1 rounded-lg text-xs ${
+                                                                row.media >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
+                                                                row.media >= 2.8 ? 'bg-amber-50 text-amber-700' :
+                                                                'bg-rose-50 text-rose-700'
+                                                            }`}>
+                                                                {row.media} ★
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                    {expandedDriver === row.name && (
+                                                        <tr className="bg-slate-50/40">
+                                                            <td colSpan={3} className="px-6 py-4">
+                                                                <div className="grid grid-cols-2 gap-4 text-xs">
+                                                                    {[
+                                                                        { label: 'Pontualidade / Atraso', val: row.criteria.atraso },
+                                                                        { label: 'Comportamento', val: row.criteria.comportamento },
+                                                                        { label: 'Condução', val: row.criteria.conducao },
+                                                                        { label: 'Estado do Veículo', val: row.criteria.estadoVeiculo }
+                                                                    ].map((item, cIdx) => (
+                                                                        <div key={cIdx} className="space-y-1">
+                                                                            <div className="flex justify-between text-slate-600 font-semibold">
+                                                                                <span>{item.label}</span>
+                                                                                <span>{item.val !== null ? `${item.val} ★` : 'N/A'}</span>
+                                                                            </div>
+                                                                            <div className="w-full bg-slate-200/60 rounded-full h-2 overflow-hidden">
+                                                                                <div 
+                                                                                    className={`h-full rounded-full ${
+                                                                                        item.val === null ? 'bg-transparent' :
+                                                                                        item.val >= 3.8 ? 'bg-emerald-500' :
+                                                                                        item.val >= 2.8 ? 'bg-amber-500' :
+                                                                                        'bg-rose-500'
+                                                                                    }`}
+                                                                                    style={{ width: item.val !== null ? `${(item.val / 5) * 100}%` : '0%' }}
+                                                                                />
+                                                                            </div>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </React.Fragment>
                                             ))}
                                             {analyticsData.driverRanking.length === 0 && (
                                                 <tr>
@@ -737,6 +880,21 @@ const GraficosPage = () => {
                                             <p className="text-slate-700 italic text-sm leading-relaxed pr-6">
                                                 "{f.comment}"
                                             </p>
+                                            {/* Sub-ratings badges */}
+                                            {f.ratings && (
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    {[
+                                                        { label: 'Atraso', val: f.ratings.atraso },
+                                                        { label: 'Comportamento', val: f.ratings.comportamento },
+                                                        { label: 'Condução', val: f.ratings.conducao },
+                                                        { label: 'Veículo', val: f.ratings.estadoVeiculo }
+                                                    ].filter(item => item.val !== null).map((item, itemIdx) => (
+                                                        <span key={itemIdx} className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-semibold border border-slate-200/50">
+                                                            {item.label}: {item.val} ★
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="border-t border-slate-100 mt-6 pt-4 flex items-center justify-between text-xs text-slate-500">
