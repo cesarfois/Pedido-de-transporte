@@ -29,7 +29,8 @@ import {
     FaFrown,
     FaSpinner,
     FaBuilding,
-    FaExternalLinkAlt
+    FaExternalLinkAlt,
+    FaSearch
 } from 'react-icons/fa';
 import { docuwareService } from '../services/docuwareService';
 
@@ -42,27 +43,50 @@ const GraficosPage = () => {
     const [rawDocs, setRawDocs] = useState([]);
     const [onlyNegatives, setOnlyNegatives] = useState(false);
 
+    // Date filter range state (default to 30 days ago to today)
+    const getTodayString = () => new Date().toISOString().split('T')[0];
+    const getThirtyDaysAgoString = () => {
+        const d = new Date();
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().split('T')[0];
+    };
+    const [dateRange, setDateRange] = useState([getThirtyDaysAgoString(), getTodayString()]);
+
+    // Fetch documents function
+    const loadData = async (startDate, endDate) => {
+        try {
+            setLoading(true);
+            setError(null);
+            
+            const queryFilters = [
+                { fieldName: 'TITULO', value: 'Pedido de Transporte' }
+            ];
+
+            if (startDate && endDate) {
+                queryFilters.push({
+                    fieldName: 'DWSTOREDATE',
+                    value: [startDate, endDate]
+                });
+            }
+
+            console.log('[Analytics] Loading documents with filters:', queryFilters);
+            const response = await docuwareService.searchDocuments(
+                CABINET_ID,
+                queryFilters,
+                2000
+            );
+            setRawDocs(response.items || []);
+        } catch (err) {
+            console.error('[Analytics] Error loading documents:', err);
+            setError('Falha ao carregar dados do DocuWare. Verifique sua conexão.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     // Fetch documents on mount
     useEffect(() => {
-        const loadData = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-                // Fetch up to 2000 documents of type "Pedido de Transporte"
-                const response = await docuwareService.searchDocuments(
-                    CABINET_ID,
-                    [{ fieldName: 'TITULO', value: 'Pedido de Transporte' }],
-                    2000
-                );
-                setRawDocs(response.items || []);
-            } catch (err) {
-                console.error('[Analytics] Error loading documents:', err);
-                setError('Falha ao carregar dados do DocuWare. Verifique sua conexão.');
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadData();
+        loadData(dateRange[0], dateRange[1]);
     }, []);
 
     // 1. Normalization & Parsing logic
@@ -290,33 +314,6 @@ const GraficosPage = () => {
         return analyticsData.feedbacks;
     }, [analyticsData.feedbacks, onlyNegatives]);
 
-    // Render loading spinner
-    if (loading) {
-        return (
-            <div className="flex flex-col items-center justify-center py-20 space-y-4">
-                <FaSpinner className="w-12 h-12 text-indigo-600 animate-spin" />
-                <p className="text-slate-600 font-semibold animate-pulse">Carregando painel analítico do DocuWare...</p>
-            </div>
-        );
-    }
-
-    // Render error alert
-    if (error) {
-        return (
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-xl mx-auto space-y-4">
-                <FaExclamationTriangle className="w-12 h-12 text-red-500 mx-auto" />
-                <h3 className="text-lg font-bold text-red-800">Falha ao Inicializar Analytics</h3>
-                <p className="text-sm text-red-600">{error}</p>
-                <button
-                    onClick={() => window.location.reload()}
-                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors"
-                >
-                    Tentar Novamente
-                </button>
-            </div>
-        );
-    }
-
     // Color definitions for bars
     const COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#10b981'];
 
@@ -343,6 +340,60 @@ const GraficosPage = () => {
                     <span>Voltar ao Controle</span>
                 </Link>
             </div>
+
+            {/* Date Picker Bar */}
+            <div className="bg-white border border-slate-100 p-5 rounded-2xl shadow-sm flex flex-wrap items-center gap-8">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-slate-600 flex items-center gap-1.5 select-none">
+                        Data Inicial:
+                    </span>
+                    <input
+                        type="date"
+                        value={dateRange[0]}
+                        onChange={(e) => setDateRange([e.target.value, dateRange[1]])}
+                        className="input input-sm input-bordered bg-white border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-slate-700 font-semibold shadow-sm w-44 h-10"
+                    />
+                </div>
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-slate-600 flex items-center gap-1.5 select-none">
+                        Data Final:
+                    </span>
+                    <input
+                        type="date"
+                        value={dateRange[1]}
+                        onChange={(e) => setDateRange([dateRange[0], e.target.value])}
+                        className="input input-sm input-bordered bg-white border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-slate-700 font-semibold shadow-sm w-44 h-10"
+                    />
+                </div>
+                <button
+                    type="button"
+                    onClick={() => loadData(dateRange[0], dateRange[1])}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm hover:shadow transition-all border-0 h-10 cursor-pointer"
+                >
+                    <FaSearch className="text-xs" />
+                    <span>Pesquisar</span>
+                </button>
+            </div>
+
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <FaSpinner className="w-12 h-12 text-indigo-600 animate-spin" />
+                    <p className="text-slate-600 font-semibold animate-pulse">Carregando painel analítico do DocuWare...</p>
+                </div>
+            ) : error ? (
+                <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center max-w-xl mx-auto space-y-4">
+                    <FaExclamationTriangle className="w-12 h-12 text-red-500 mx-auto" />
+                    <h3 className="text-lg font-bold text-red-800">Falha ao Inicializar Analytics</h3>
+                    <p className="text-sm text-red-600">{error}</p>
+                    <button
+                        onClick={() => loadData(dateRange[0], dateRange[1])}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                    >
+                        Tentar Novamente
+                    </button>
+                </div>
+            ) : (
+                <>
 
             {/* Main KPI Cards Section */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -690,6 +741,8 @@ const GraficosPage = () => {
                     </div>
                 </div>
             </div>
+                </>
+            )}
         </div>
     );
 };
