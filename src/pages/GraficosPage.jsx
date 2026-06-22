@@ -10,7 +10,8 @@ import {
     ResponsiveContainer,
     LineChart,
     Line,
-    Cell
+    Cell,
+    LabelList
 } from 'recharts';
 import {
     FaChartBar,
@@ -44,6 +45,7 @@ const GraficosPage = () => {
     const [activeTab, setActiveTab] = useState('dashboard'); // 'dashboard' or 'timeline'
     const [commentsTab, setCommentsTab] = useState('elogios'); // 'elogios' or 'sugestoes'
     const [expandedDriver, setExpandedDriver] = useState(null); // name of expanded driver for details
+    const [activePillarDetail, setActivePillarDetail] = useState(null); // Selected pillar for modal analysis
 
     // Historical data states (Lazy loaded)
     const [historicalDocs, setHistoricalDocs] = useState([]);
@@ -433,6 +435,85 @@ const GraficosPage = () => {
         const sugestoes = analyticsData.feedbacks.filter(f => f.rating < 3.5);
         return { elogios, sugestoes };
     }, [analyticsData.feedbacks]);
+    
+    // Dynamic XAxis domain min value calculation
+    const xDomainMin = useMemo(() => {
+        if (!analyticsData || !analyticsData.pillarsAverages) return 0;
+        const medias = analyticsData.pillarsAverages.map(p => p.media).filter(m => m > 0);
+        if (medias.length === 0) return 0;
+        const minMedia = Math.min(...medias);
+        // Round down slightly below the lowest score to zoom in clearly
+        return Math.max(0, parseFloat((minMedia - 0.2).toFixed(1)));
+    }, [analyticsData.pillarsAverages]);
+
+    // Detail analysis data for a selected operational pillar
+    const selectedPillarStats = useMemo(() => {
+        if (!activePillarDetail) return null;
+        
+        // Map display name to rating key
+        const keyMap = {
+            'Pontualidade / Atraso': 'atraso',
+            'Comportamento': 'comportamento',
+            'Condução': 'conducao',
+            'Estado do Veículo': 'estadoVeiculo'
+        };
+        const ratingKey = keyMap[activePillarDetail];
+        if (!ratingKey) return null;
+
+        const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        let totalCount = 0;
+        let sum = 0;
+        const relatedComments = [];
+
+        rawDocs.forEach(doc => {
+            const rawVal = getDocFieldValue(doc, ratingKey === 'atraso' ? 'AVALIACAO_ATRASO' : 
+                                                 ratingKey === 'comportamento' ? 'AVALIACAO_COMPORTAMENTO' :
+                                                 ratingKey === 'conducao' ? 'AVALIACAO_CONDUCAO' : 'AVALIACAO_ESTADO_VEICULO');
+            const val = parseRating(rawVal);
+            if (val !== null) {
+                counts[val]++;
+                totalCount++;
+                sum += val;
+
+                const comment = getDocFieldValue(doc, 'COMENTARIO') || getDocFieldValue(doc, 'COMENTARIO_2') || '';
+                const driverRcs = getDocFieldValue(doc, 'MOTORISTA');
+                const driverG4s = getDocFieldValue(doc, 'MOTORISTA_G4S');
+                const driver = driverRcs || driverG4s || 'Não Especificado';
+                const requester = getDocFieldValue(doc, 'REQUERENTE') || 'Não Especificado';
+                const rawDate = getDocFieldValue(doc, 'DATA_PEDIDO') || getDocFieldValue(doc, 'DATA_ACTIVIDADE') || getDocFieldValue(doc, 'DWSTOREDATETIME');
+                const date = parseDWDate(rawDate);
+
+                if (comment.trim() !== '') {
+                    relatedComments.push({
+                        rating: val,
+                        comment,
+                        driver,
+                        requester,
+                        date: date ? date.toLocaleDateString('pt-BR') : '-',
+                        docId: doc.Id,
+                        viewUrl: docuwareService.getDocumentViewUrl(CABINET_ID, doc.Id)
+                    });
+                }
+            }
+        });
+
+        const distribution = Object.keys(counts).map(star => ({
+            star: `${star} ★`,
+            count: counts[star],
+            percentage: totalCount > 0 ? parseFloat(((counts[star] / totalCount) * 100).toFixed(1)) : 0
+        }));
+
+        // Sort comments: lower ratings first
+        relatedComments.sort((a, b) => a.rating - b.rating);
+
+        return {
+            name: activePillarDetail,
+            average: totalCount > 0 ? parseFloat((sum / totalCount).toFixed(2)) : 0,
+            totalCount,
+            distribution,
+            comments: relatedComments
+        };
+    }, [activePillarDetail, rawDocs]);
 
     // Color definitions for bars
     const COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#10b981'];
@@ -1030,6 +1111,130 @@ const GraficosPage = () => {
                     )}
                 </div>
             )}
+            {/* Modal for Root Cause Analysis (Pillar Detail) */}
+            {activePillarDetail && selectedPillarStats && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity animate-fade-in">
+                    <div className="bg-white rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100 flex flex-col max-h-[85vh] animate-scale-up text-left">
+                        {/* Modal Header */}
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-900">
+                                    Análise de Causa Raiz: {selectedPillarStats.name}
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-1">
+                                    Média de {selectedPillarStats.average} ★ baseada em {selectedPillarStats.totalCount} avaliações
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setActivePillarDetail(null)}
+                                className="p-2 hover:bg-slate-200/50 rounded-xl text-slate-400 hover:text-slate-600 transition-colors cursor-pointer border-0 bg-transparent text-lg font-bold"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <div className="p-6 overflow-y-auto space-y-6">
+                            {/* Distribution Bars */}
+                            <div className="space-y-3">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Distribuição de Notas</h4>
+                                <div className="space-y-2">
+                                    {selectedPillarStats.distribution.slice().reverse().map((item, idx) => (
+                                        <div key={idx} className="flex items-center gap-3 text-xs">
+                                            <span className="w-10 text-slate-600 font-semibold">{item.star}</span>
+                                            <div className="flex-1 h-3 bg-slate-100 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`h-full rounded-full transition-all duration-500 ${
+                                                        idx === 0 ? 'bg-emerald-500' :
+                                                        idx === 1 ? 'bg-cyan-500' :
+                                                        idx === 2 ? 'bg-amber-500' :
+                                                        idx === 3 ? 'bg-orange-500' :
+                                                        'bg-rose-500'
+                                                    }`}
+                                                    style={{ width: `${item.percentage}%` }}
+                                                />
+                                            </div>
+                                            <span className="w-20 text-right text-slate-500 font-semibold">
+                                                {item.count} ({item.percentage}%)
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Qualitative Comments for this Pillar */}
+                            <div className="space-y-3">
+                                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Comentários Relacionados</h4>
+                                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                                    {selectedPillarStats.comments.map((comment, idx) => (
+                                        <div key={idx} className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 relative group hover:border-slate-200 transition-colors">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
+                                                        comment.rating >= 4 ? 'bg-emerald-50 text-emerald-700' :
+                                                        comment.rating >= 3 ? 'bg-amber-50 text-amber-700' :
+                                                        'bg-rose-50 text-rose-700'
+                                                    }`}>
+                                                        {comment.rating} ★
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400 font-medium">{comment.date}</span>
+                                                </div>
+                                                <a
+                                                    href={comment.viewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                                                >
+                                                    Ver Pedido <FaExternalLinkAlt className="text-[8px]" />
+                                                </a>
+                                            </div>
+                                            <p className="text-slate-700 italic text-xs leading-relaxed">
+                                                "{comment.comment}"
+                                            </p>
+                                            <div className="mt-3 pt-2 border-t border-slate-100/50 flex justify-between text-[10px] text-slate-500">
+                                                <span>Requerente: {comment.requester.split('@')[0]}</span>
+                                                <span>Motorista: {comment.driver}</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {selectedPillarStats.comments.length === 0 && (
+                                        <p className="text-center text-slate-400 text-xs py-8">
+                                            Nenhum comentário associado a este pilar.
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Modal Footer */}
+                        <div className="p-4 border-t border-slate-100 flex justify-end bg-slate-50/30">
+                            <button
+                                onClick={() => setActivePillarDetail(null)}
+                                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer border-0"
+                            >
+                                Fechar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes scaleUp {
+                    from { transform: scale(0.95); opacity: 0; }
+                    to { transform: scale(1); opacity: 1; }
+                }
+                .animate-fade-in {
+                    animation: fadeIn 0.2s ease-out forwards;
+                }
+                .animate-scale-up {
+                    animation: scaleUp 0.2s ease-out forwards;
+                }
+            `}</style>
         </div>
     );
 };
