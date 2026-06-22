@@ -632,75 +632,76 @@ const GraficosPage = () => {
                 </div>
             ) : (
                 <>
-                    {activeTab === 'dashboard' && (
-                        <div className="space-y-8 animate-fade-in">
-                            {/* Main KPI Cards Section */}
-                            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                                {/* Global Avg */}
-                                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-slate-500">Média de Satisfação</span>
-                                        <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold">Geral</span>
-                                    </div>
-                                    <div className="mt-4 flex items-baseline gap-2">
-                                        <span className="text-4xl font-extrabold text-slate-950">{analyticsData.avgSatisfaction}</span>
-                                        <span className="text-sm text-slate-400">/ 5.0</span>
-                                    </div>
-                                    <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
-                                        <FaInfoCircle className="text-indigo-500 shrink-0" />
-                                        <span>Média ponderada de todas as respostas</span>
-                                    </div>
+                    {activeTab !== 'timeline' && (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-fade-in">
+                            {/* Global Avg */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-slate-500">Média de Satisfação</span>
+                                    <span className="p-2 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-bold">Geral</span>
                                 </div>
-
-                                {/* Total Requests */}
-                                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-slate-500">Total de Pedidos</span>
-                                        <span className="p-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">Finalizados</span>
-                                    </div>
-                                    <div className="mt-4 flex items-baseline gap-2">
-                                        <span className="text-4xl font-extrabold text-slate-950">{analyticsData.totalDocs}</span>
-                                        <span className="text-sm text-slate-400">pedidos</span>
-                                    </div>
-                                    <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
-                                        <FaCheckCircle className="text-indigo-500 shrink-0" />
-                                        <span>Viagens concluídas no período analisado</span>
-                                    </div>
+                                <div className="mt-4 flex items-baseline gap-2">
+                                    <span className="text-4xl font-extrabold text-slate-950">{analyticsData.avgSatisfaction}</span>
+                                    <span className="text-sm text-slate-400">/ 5.0</span>
                                 </div>
-
-                                {/* Total Received / Participation Rate */}
-                                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-slate-500">Avaliações Recebidas</span>
-                                        <span className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold">Com Notas</span>
-                                    </div>
-                                    <div className="mt-4 flex items-baseline gap-2">
-                                        <span className="text-4xl font-extrabold text-slate-950">{analyticsData.totalEvaluations}</span>
-                                        <span className="text-sm text-slate-400">({analyticsData.participationRate}%)</span>
-                                    </div>
-                                    <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
-                                        <FaSmile className="text-emerald-500 shrink-0" />
-                                        <span>{analyticsData.percentPositive}% de satisfação positiva</span>
-                                    </div>
-                                </div>
-
-                                {/* Negatives Count */}
-                                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm font-semibold text-slate-500">Alertas Negativos</span>
-                                        <span className="p-2 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold">Notas 1 e 2</span>
-                                    </div>
-                                    <div className="mt-4 flex items-baseline gap-2">
-                                        <span className="text-4xl font-extrabold text-slate-950">{analyticsData.negativeEvaluations}</span>
-                                        <span className="text-sm text-slate-400">críticas</span>
-                                    </div>
-                                    <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
-                                        <FaFrown className="text-rose-500 shrink-0" />
-                                        <span>Avaliações críticas que necessitam de contato</span>
-                                    </div>
+                                <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
+                                    <FaInfoCircle className="text-indigo-500 shrink-0" />
+                                    <span>Média ponderada de todas as respostas</span>
                                 </div>
                             </div>
 
+                            {/* Total Requests */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-slate-500">Total de Pedidos</span>
+                                    <span className="p-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">Finalizados</span>
+                                </div>
+                                <div className="mt-4 flex items-baseline gap-2">
+                                    <span className="text-4xl font-extrabold text-slate-950">{analyticsData.totalDocs}</span>
+                                    <span className="text-sm text-slate-400">pedidos</span>
+                                </div>
+                                <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
+                                    <FaCheckCircle className="text-indigo-500 shrink-0" />
+                                    <span>Viagens concluídas no período analisado</span>
+                                </div>
+                            </div>
+
+                            {/* Total Received / Participation Rate */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-slate-500">Avaliações Recebidas</span>
+                                    <span className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold">Com Notas</span>
+                                </div>
+                                <div className="mt-4 flex items-baseline gap-2">
+                                    <span className="text-4xl font-extrabold text-slate-950">{analyticsData.totalEvaluations}</span>
+                                    <span className="text-sm text-slate-400">({analyticsData.participationRate}%)</span>
+                                </div>
+                                <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
+                                    <FaSmile className="text-emerald-500 shrink-0" />
+                                    <span>{analyticsData.percentPositive}% de satisfação positiva</span>
+                                </div>
+                            </div>
+
+                            {/* Negatives Count */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-slate-500">Alertas Negativos</span>
+                                    <span className="p-2 bg-rose-50 text-rose-600 rounded-lg text-xs font-bold">Notas 1 e 2</span>
+                                </div>
+                                <div className="mt-4 flex items-baseline gap-2">
+                                    <span className="text-4xl font-extrabold text-slate-950">{analyticsData.negativeEvaluations}</span>
+                                    <span className="text-sm text-slate-400">críticas</span>
+                                </div>
+                                <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
+                                    <FaFrown className="text-rose-500 shrink-0" />
+                                    <span>Avaliações críticas que necessitam de contato</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'dashboard' && (
+                        <div className="space-y-8 animate-fade-in">
                             {/* Charts Section */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 {/* Distribution Chart */}
