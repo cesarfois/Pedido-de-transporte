@@ -46,6 +46,7 @@ const GraficosPage = () => {
     const [commentsTab, setCommentsTab] = useState('elogios'); // 'elogios' or 'sugestoes'
     const [expandedDriver, setExpandedDriver] = useState(null); // name of expanded driver for details
     const [activePillarDetail, setActivePillarDetail] = useState(null); // Selected pillar for modal analysis
+    const [showTableLegend, setShowTableLegend] = useState(false); // Toggle explanation legend
 
     // Historical data states (Lazy loaded)
     const [historicalDocs, setHistoricalDocs] = useState([]);
@@ -777,10 +778,57 @@ const GraficosPage = () => {
                         <div className="space-y-8">
                             {/* Drivers Ranking */}
                             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
-                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                                    <FaUsers className="text-indigo-500" />
-                                    Qualidade por Motorista (Visão Detalhada)
-                                </h3>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                        <FaUsers className="text-indigo-500" />
+                                        Qualidade por Motorista (Visão Detalhada)
+                                    </h3>
+                                    <button
+                                        onClick={() => setShowTableLegend(!showTableLegend)}
+                                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl transition-all border border-slate-200 bg-white cursor-pointer"
+                                        title="Ver legenda de colunas"
+                                    >
+                                        <FaInfoCircle className="text-sm" />
+                                        <span>Legenda das Colunas</span>
+                                    </button>
+                                </div>
+
+                                {showTableLegend && (
+                                    <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 text-xs text-slate-600 space-y-3 animate-fade-in">
+                                        <h4 className="font-bold text-slate-800 text-sm">Metodologia e Origem dos Dados (DocuWare)</h4>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Pedidos</p>
+                                                <p className="text-slate-500 mt-0.5">Total de documentos do tipo "Pedido de Transporte" finalizados no período.</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Avaliações</p>
+                                                <p className="text-slate-500 mt-0.5">Pedidos que receberam ao menos uma nota válida na pesquisa de satisfação.</p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Pontualidade / Atraso</p>
+                                                <p className="text-slate-500 mt-0.5">Média das notas de pontualidade. Campo no DocuWare: <code className="bg-slate-200/50 px-1 py-0.5 rounded text-indigo-600">AVALIACAO_ATRASO</code></p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Comportamento</p>
+                                                <p className="text-slate-500 mt-0.5">Média de conduta do motorista. Campo no DocuWare: <code className="bg-slate-200/50 px-1 py-0.5 rounded text-indigo-600">AVALIACAO_COMPORTAMENTO</code></p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Condução</p>
+                                                <p className="text-slate-500 mt-0.5">Média de segurança na direção. Campo no DocuWare: <code className="bg-slate-200/50 px-1 py-0.5 rounded text-indigo-600">AVALIACAO_CONDUCAO</code></p>
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-slate-800">Estado Veículo</p>
+                                                <p className="text-slate-500 mt-0.5">Média de conservação. Campo no DocuWare: <code className="bg-slate-200/50 px-1 py-0.5 rounded text-indigo-600">AVALIACAO_ESTADO_VEICULO</code></p>
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <p className="font-semibold text-indigo-600">Média Geral</p>
+                                                <p className="text-slate-500 mt-0.5">Média aritmética simples de todos os critérios preenchidos (valores nulos ou "0 - N/A" são desconsiderados do cálculo).</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 <div className="overflow-x-auto">
                                     <table className="w-full text-sm text-left table-auto">
                                         <thead>
@@ -788,11 +836,11 @@ const GraficosPage = () => {
                                                 <th className="py-3 pr-4">Motorista</th>
                                                 <th className="py-3 px-3 text-center">Pedidos</th>
                                                 <th className="py-3 px-3 text-center">Avaliações</th>
-                                                <th className="py-3 px-3 text-center">Média Geral</th>
                                                 <th className="py-3 px-3 text-center">Pontualidade / Atraso</th>
                                                 <th className="py-3 px-3 text-center">Comportamento</th>
                                                 <th className="py-3 px-3 text-center">Condução</th>
                                                 <th className="py-3 px-3 text-center">Estado Veículo</th>
+                                                <th className="py-3 px-3 text-center">Média Geral</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-700">
@@ -801,15 +849,6 @@ const GraficosPage = () => {
                                                     <td className="py-3.5 pr-4 font-semibold text-slate-900">{row.name}</td>
                                                     <td className="py-3.5 px-3 text-center text-slate-500 font-medium">{row.totalRequests}</td>
                                                     <td className="py-3.5 px-3 text-center text-slate-500 font-medium">{row.count}</td>
-                                                    <td className="py-3.5 px-3 text-center font-bold">
-                                                        <span className={`px-2.5 py-1 rounded-lg text-xs ${
-                                                            row.media >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
-                                                            row.media >= 2.8 ? 'bg-amber-50 text-amber-700' :
-                                                            'bg-rose-50 text-rose-700'
-                                                        }`}>
-                                                            {row.media} ★
-                                                        </span>
-                                                    </td>
                                                     {[
                                                         row.criteria.atraso,
                                                         row.criteria.comportamento,
@@ -830,6 +869,15 @@ const GraficosPage = () => {
                                                             )}
                                                         </td>
                                                     ))}
+                                                    <td className="py-3.5 px-3 text-center font-bold">
+                                                        <span className={`px-2.5 py-1 rounded-lg text-xs ${
+                                                            row.media >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
+                                                            row.media >= 2.8 ? 'bg-amber-50 text-amber-700' :
+                                                            'bg-rose-50 text-rose-700'
+                                                        }`}>
+                                                            {row.media} ★
+                                                        </span>
+                                                    </td>
                                                 </tr>
                                             ))}
                                             {analyticsData.driverRanking.length === 0 && (
