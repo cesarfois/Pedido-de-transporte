@@ -53,13 +53,14 @@ const GraficosPage = () => {
     const [historicalError, setHistoricalError] = useState(null);
     const [historicalLoaded, setHistoricalLoaded] = useState(false);
 
-    // Date filter range state (default to current calendar month)
+    // Date filter range state (default to last 30 days)
     const getTodayString = () => new Date().toISOString().split('T')[0];
-    const getStartOfCurrentMonthString = () => {
+    const getLast30DaysString = () => {
         const d = new Date();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+        d.setDate(d.getDate() - 30);
+        return d.toISOString().split('T')[0];
     };
-    const [dateRange, setDateRange] = useState([getStartOfCurrentMonthString(), getTodayString()]);
+    const [dateRange, setDateRange] = useState([getLast30DaysString(), getTodayString()]);
 
     // Fetch documents function for dashboard
     const loadData = async (startDate, endDate) => {
