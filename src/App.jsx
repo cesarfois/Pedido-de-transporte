@@ -53,7 +53,7 @@ function App() {
               }
             />
             <Route
-              path="/graficos"
+              path="/pedido-de-transporte/graficos"
               element={
                 <ProtectedRoute>
                   <DashboardLayout>
