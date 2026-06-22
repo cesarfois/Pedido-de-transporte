@@ -31,7 +31,8 @@ import {
     FaSpinner,
     FaBuilding,
     FaExternalLinkAlt,
-    FaSearch
+    FaSearch,
+    FaDownload
 } from 'react-icons/fa';
 import { docuwareService } from '../services/docuwareService';
 
@@ -396,7 +397,8 @@ const GraficosPage = () => {
             driverRanking,
             deptRanking,
             feedbacks,
-            pillarsAverages
+            pillarsAverages,
+            rawEvaluations: evaluatedRequests
         };
     }, [rawDocs]);
 
@@ -532,6 +534,60 @@ const GraficosPage = () => {
     // Color definitions for bars
     const COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#10b981'];
 
+    const handleExportCSV = () => {
+        const dataToExport = analyticsData?.rawEvaluations || [];
+        if (dataToExport.length === 0) {
+            alert('Não há avaliações disponíveis no período selecionado para exportar.');
+            return;
+        }
+
+        const headers = [
+            'ID Documento',
+            'Data',
+            'Requerente',
+            'Departamento',
+            'Motorista',
+            'Pontualidade_Atraso',
+            'Comportamento',
+            'Conducao',
+            'Estado_Veiculo',
+            'Media_Geral',
+            'Comentario'
+        ];
+
+        const csvRows = [];
+        // Add UTF-8 BOM so Excel opens it with correct encoding (accented characters)
+        csvRows.push('\uFEFF' + headers.join(';'));
+
+        dataToExport.forEach(item => {
+            const row = [
+                item.id,
+                item.date ? item.date.toLocaleDateString('pt-BR') : '',
+                `"${(item.requester || '').replace(/"/g, '""')}"`,
+                `"${(item.department || '').replace(/"/g, '""')}"`,
+                `"${(item.driver || '').replace(/"/g, '""')}"`,
+                item.ratings.atraso !== null ? item.ratings.atraso : '',
+                item.ratings.comportamento !== null ? item.ratings.comportamento : '',
+                item.ratings.conducao !== null ? item.ratings.conducao : '',
+                item.ratings.estadoVeiculo !== null ? item.ratings.estadoVeiculo : '',
+                item.averageRating ? item.averageRating.toFixed(2) : '',
+                `"${(item.comment || '').replace(/\r?\n/g, ' ').replace(/"/g, '""')}"`
+            ];
+            csvRows.push(row.join(';'));
+        });
+
+        const csvContent = csvRows.join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', `avaliacoes_satisfacao_${dateRange[0]}_a_${dateRange[1]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="space-y-8 pb-12">
             {/* Top Bar with Navigation Link */}
@@ -587,6 +643,14 @@ const GraficosPage = () => {
                 >
                     <FaSearch className="text-xs" />
                     <span>Pesquisar</span>
+                </button>
+                <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 rounded-xl shadow-sm hover:shadow transition-all h-10 cursor-pointer ml-auto sm:ml-0"
+                >
+                    <FaDownload className="text-xs text-slate-500 group-hover:text-slate-700" />
+                    <span>Exportar CSV</span>
                 </button>
             </div>
 
