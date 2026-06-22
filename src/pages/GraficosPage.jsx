@@ -249,6 +249,17 @@ const GraficosPage = () => {
             starNum: parseInt(star)
         }));
 
+        // Count total requests (evaluated or not) per driver
+        const driverTotalRequests = {};
+        rawDocs.forEach(doc => {
+            const driverRcs = getDocFieldValue(doc, 'MOTORISTA');
+            const driverG4s = getDocFieldValue(doc, 'MOTORISTA_G4S');
+            const driver = driverRcs || driverG4s || 'Não Especificado';
+            if (driver !== 'Não Especificado') {
+                driverTotalRequests[driver] = (driverTotalRequests[driver] || 0) + 1;
+            }
+        });
+
         // Driver Rankings with sub-criteria details (Atraso, Comportamento, Condução, Estado do Veículo)
         const driverGroups = {};
         let globalAtrasoSum = 0, globalAtrasoCount = 0;
@@ -309,6 +320,7 @@ const GraficosPage = () => {
                     name,
                     media: parseFloat((g.sum / g.count).toFixed(2)),
                     count: g.count,
+                    totalRequests: driverTotalRequests[name] || g.count,
                     criteria: {
                         atraso: g.atrasoCount > 0 ? parseFloat((g.atrasoSum / g.atrasoCount).toFixed(2)) : null,
                         comportamento: g.comportamentoCount > 0 ? parseFloat((g.comportamentoSum / g.comportamentoCount).toFixed(2)) : null,
@@ -762,83 +774,67 @@ const GraficosPage = () => {
                         </div>
 
                         {/* Rankings Grid Section */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="space-y-8">
                             {/* Drivers Ranking */}
                             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
                                 <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                                     <FaUsers className="text-indigo-500" />
-                                    Qualidade por Motorista
+                                    Qualidade por Motorista (Visão Detalhada)
                                 </h3>
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm text-left">
+                                    <table className="w-full text-sm text-left table-auto">
                                         <thead>
-                                            <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs">
-                                                <th className="py-3">Motorista</th>
-                                                <th className="py-3 text-center">Respostas</th>
-                                                <th className="py-3 text-right">Nota Média</th>
+                                            <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs whitespace-nowrap">
+                                                <th className="py-3 pr-4">Motorista</th>
+                                                <th className="py-3 px-3 text-center">Pedidos</th>
+                                                <th className="py-3 px-3 text-center">Avaliações</th>
+                                                <th className="py-3 px-3 text-center">Média Geral</th>
+                                                <th className="py-3 px-3 text-center">Pontualidade / Atraso</th>
+                                                <th className="py-3 px-3 text-center">Comportamento</th>
+                                                <th className="py-3 px-3 text-center">Condução</th>
+                                                <th className="py-3 px-3 text-center">Estado Veículo</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-slate-50 text-slate-700">
                                             {analyticsData.driverRanking.map((row, idx) => (
-                                                <React.Fragment key={idx}>
-                                                    <tr 
-                                                        className="hover:bg-slate-50/50 cursor-pointer transition-colors"
-                                                        onClick={() => setExpandedDriver(expandedDriver === row.name ? null : row.name)}
-                                                    >
-                                                        <td className="py-3 font-semibold text-slate-900 flex items-center gap-2">
-                                                            <span className="text-[10px] text-slate-400">
-                                                                {expandedDriver === row.name ? '▼' : '▶'}
-                                                            </span>
-                                                            {row.name}
+                                                <tr key={idx} className="hover:bg-slate-50/50 transition-colors whitespace-nowrap">
+                                                    <td className="py-3.5 pr-4 font-semibold text-slate-900">{row.name}</td>
+                                                    <td className="py-3.5 px-3 text-center text-slate-500 font-medium">{row.totalRequests}</td>
+                                                    <td className="py-3.5 px-3 text-center text-slate-500 font-medium">{row.count}</td>
+                                                    <td className="py-3.5 px-3 text-center font-bold">
+                                                        <span className={`px-2.5 py-1 rounded-lg text-xs ${
+                                                            row.media >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
+                                                            row.media >= 2.8 ? 'bg-amber-50 text-amber-700' :
+                                                            'bg-rose-50 text-rose-700'
+                                                        }`}>
+                                                            {row.media} ★
+                                                        </span>
+                                                    </td>
+                                                    {[
+                                                        row.criteria.atraso,
+                                                        row.criteria.comportamento,
+                                                        row.criteria.conducao,
+                                                        row.criteria.estadoVeiculo
+                                                    ].map((val, valIdx) => (
+                                                        <td key={valIdx} className="py-3.5 px-3 text-center">
+                                                            {val !== null ? (
+                                                                <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                                                                    val >= 3.8 ? 'bg-emerald-50 text-emerald-600' :
+                                                                    val >= 2.8 ? 'bg-amber-50 text-amber-600' :
+                                                                    'bg-rose-50 text-rose-600'
+                                                                }`}>
+                                                                    {val} ★
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-slate-300 font-normal">-</span>
+                                                            )}
                                                         </td>
-                                                        <td className="py-3 text-center text-slate-500">{row.count}</td>
-                                                        <td className="py-3 text-right font-bold">
-                                                            <span className={`px-2.5 py-1 rounded-lg text-xs ${
-                                                                row.media >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
-                                                                row.media >= 2.8 ? 'bg-amber-50 text-amber-700' :
-                                                                'bg-rose-50 text-rose-700'
-                                                            }`}>
-                                                                {row.media} ★
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    {expandedDriver === row.name && (
-                                                        <tr className="bg-slate-50/40">
-                                                            <td colSpan={3} className="px-6 py-4">
-                                                                <div className="grid grid-cols-2 gap-4 text-xs">
-                                                                    {[
-                                                                        { label: 'Pontualidade / Atraso', val: row.criteria.atraso },
-                                                                        { label: 'Comportamento', val: row.criteria.comportamento },
-                                                                        { label: 'Condução', val: row.criteria.conducao },
-                                                                        { label: 'Estado do Veículo', val: row.criteria.estadoVeiculo }
-                                                                    ].map((item, cIdx) => (
-                                                                        <div key={cIdx} className="space-y-1">
-                                                                            <div className="flex justify-between text-slate-600 font-semibold">
-                                                                                <span>{item.label}</span>
-                                                                                <span>{item.val !== null ? `${item.val} ★` : 'N/A'}</span>
-                                                                            </div>
-                                                                            <div className="w-full bg-slate-200/60 rounded-full h-2 overflow-hidden">
-                                                                                <div 
-                                                                                    className={`h-full rounded-full ${
-                                                                                        item.val === null ? 'bg-transparent' :
-                                                                                        item.val >= 3.8 ? 'bg-emerald-500' :
-                                                                                        item.val >= 2.8 ? 'bg-amber-500' :
-                                                                                        'bg-rose-500'
-                                                                                    }`}
-                                                                                    style={{ width: item.val !== null ? `${(item.val / 5) * 100}%` : '0%' }}
-                                                                                />
-                                                                            </div>
-                                                                        </div>
-                                                                    ))}
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </React.Fragment>
+                                                    ))}
+                                                </tr>
                                             ))}
                                             {analyticsData.driverRanking.length === 0 && (
                                                 <tr>
-                                                    <td colSpan={3} className="py-8 text-center text-slate-400">Nenhum motorista avaliado ainda.</td>
+                                                    <td colSpan={8} className="py-8 text-center text-slate-400">Nenhum motorista avaliado ainda.</td>
                                                 </tr>
                                             )}
                                         </tbody>
