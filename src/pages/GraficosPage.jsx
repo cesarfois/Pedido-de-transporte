@@ -245,11 +245,13 @@ const GraficosPage = () => {
                 distCounts[rounded]++;
             }
         });
-        const distribution = Object.keys(distCounts).map(star => ({
-            name: `${star} ★`,
-            quantidade: distCounts[star],
-            starNum: parseInt(star)
-        }));
+        const distribution = Object.keys(distCounts)
+            .reverse()
+            .map(star => ({
+                name: `${star} ★`,
+                quantidade: distCounts[star],
+                starNum: parseInt(star)
+            }));
 
         // Count total requests (evaluated or not) per driver
         const driverTotalRequests = {};
