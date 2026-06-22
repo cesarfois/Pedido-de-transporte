@@ -534,46 +534,40 @@ const GraficosPage = () => {
     // Color definitions for bars
     const COLORS = ['#ef4444', '#f97316', '#eab308', '#06b6d4', '#10b981'];
 
-    const handleExportCSV = () => {
-        const dataToExport = analyticsData?.rawEvaluations || [];
+    const handleExportDriversCSV = () => {
+        const dataToExport = analyticsData?.driverRanking || [];
         if (dataToExport.length === 0) {
-            alert('Não há avaliações disponíveis no período selecionado para exportar.');
+            alert('Não há dados de motoristas disponíveis no período selecionado para exportar.');
             return;
         }
 
         const headers = [
-            'ID Documento',
-            'Data',
-            'Requerente',
-            'Departamento',
             'Motorista',
-            'Pontualidade_Atraso',
+            'Pedidos',
+            'Avaliações',
+            'Pontualidade / Atraso',
             'Comportamento',
-            'Conducao',
-            'Estado_Veiculo',
-            'Media_Geral',
-            'Comentario'
+            'Condução',
+            'Estado do Veículo',
+            'Média Geral'
         ];
 
         const csvRows = [];
         // Add UTF-8 BOM so Excel opens it with correct encoding (accented characters)
         csvRows.push('\uFEFF' + headers.join(';'));
 
-        dataToExport.forEach(item => {
-            const row = [
-                item.id,
-                item.date ? item.date.toLocaleDateString('pt-BR') : '',
-                `"${(item.requester || '').replace(/"/g, '""')}"`,
-                `"${(item.department || '').replace(/"/g, '""')}"`,
-                `"${(item.driver || '').replace(/"/g, '""')}"`,
-                item.ratings.atraso !== null ? item.ratings.atraso : '',
-                item.ratings.comportamento !== null ? item.ratings.comportamento : '',
-                item.ratings.conducao !== null ? item.ratings.conducao : '',
-                item.ratings.estadoVeiculo !== null ? item.ratings.estadoVeiculo : '',
-                item.averageRating ? item.averageRating.toFixed(2) : '',
-                `"${(item.comment || '').replace(/\r?\n/g, ' ').replace(/"/g, '""')}"`
+        dataToExport.forEach(row => {
+            const csvRow = [
+                `"${(row.name || '').replace(/"/g, '""')}"`,
+                row.totalRequests,
+                row.count,
+                row.criteria.atraso !== null ? row.criteria.atraso : '',
+                row.criteria.comportamento !== null ? row.criteria.comportamento : '',
+                row.criteria.conducao !== null ? row.criteria.conducao : '',
+                row.criteria.estadoVeiculo !== null ? row.criteria.estadoVeiculo : '',
+                row.media !== null ? row.media : ''
             ];
-            csvRows.push(row.join(';'));
+            csvRows.push(csvRow.join(';'));
         });
 
         const csvContent = csvRows.join('\n');
@@ -581,7 +575,7 @@ const GraficosPage = () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', `avaliacoes_satisfacao_${dateRange[0]}_a_${dateRange[1]}.csv`);
+        link.setAttribute('download', `ranking_motoristas_${dateRange[0]}_a_${dateRange[1]}.csv`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
@@ -643,14 +637,6 @@ const GraficosPage = () => {
                 >
                     <FaSearch className="text-xs" />
                     <span>Pesquisar</span>
-                </button>
-                <button
-                    type="button"
-                    onClick={handleExportCSV}
-                    className="flex items-center justify-center gap-2 px-6 py-2.5 text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 rounded-xl shadow-sm hover:shadow transition-all h-10 cursor-pointer ml-auto sm:ml-0"
-                >
-                    <FaDownload className="text-xs text-slate-500 group-hover:text-slate-700" />
-                    <span>Exportar CSV</span>
                 </button>
             </div>
 
@@ -858,14 +844,26 @@ const GraficosPage = () => {
                                     <FaUsers className="text-indigo-500" />
                                     Qualidade por Motorista (Visão Detalhada)
                                 </h3>
-                                <button
-                                    onClick={() => setShowTableLegend(!showTableLegend)}
-                                    className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl transition-all border border-slate-200 bg-white cursor-pointer"
-                                    title="Ver legenda de colunas"
-                                >
-                                    <FaInfoCircle className="text-sm" />
-                                    <span>Legenda das Colunas</span>
-                                </button>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleExportDriversCSV}
+                                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl transition-all border border-slate-200 bg-white cursor-pointer"
+                                        title="Exportar dados de motoristas em CSV"
+                                    >
+                                        <FaDownload className="text-sm text-slate-500" />
+                                        <span>Exportar CSV</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowTableLegend(!showTableLegend)}
+                                        className="flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl transition-all border border-slate-200 bg-white cursor-pointer"
+                                        title="Ver legenda de colunas"
+                                    >
+                                        <FaInfoCircle className="text-sm" />
+                                        <span>Legenda das Colunas</span>
+                                    </button>
+                                </div>
                             </div>
 
                             {showTableLegend && (
