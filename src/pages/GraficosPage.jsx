@@ -638,30 +638,31 @@ const GraficosPage = () => {
                                 </div>
                             </div>
 
-                            {/* Participation Rate */}
+                            {/* Total Requests */}
                             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-slate-500">Taxa de Participação</span>
-                                    <span className="p-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">Respostas vs Total</span>
+                                    <span className="text-sm font-semibold text-slate-500">Total de Pedidos</span>
+                                    <span className="p-2 bg-blue-50 text-blue-600 rounded-lg text-xs font-bold">Finalizados</span>
                                 </div>
                                 <div className="mt-4 flex items-baseline gap-2">
-                                    <span className="text-4xl font-extrabold text-slate-950">{analyticsData.participationRate}%</span>
+                                    <span className="text-4xl font-extrabold text-slate-950">{analyticsData.totalDocs}</span>
+                                    <span className="text-sm text-slate-400">pedidos</span>
                                 </div>
                                 <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
-                                    <FaCheckCircle className="text-emerald-500 shrink-0" />
-                                    <span>{analyticsData.totalEvaluations} de {analyticsData.totalDocs} pedidos finalizados</span>
+                                    <FaCheckCircle className="text-indigo-500 shrink-0" />
+                                    <span>Viagens concluídas no período analisado</span>
                                 </div>
                             </div>
 
-                            {/* Total Received */}
+                            {/* Total Received / Participation Rate */}
                             <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-slate-500">Total de Avaliações</span>
+                                    <span className="text-sm font-semibold text-slate-500">Avaliações Recebidas</span>
                                     <span className="p-2 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-bold">Com Notas</span>
                                 </div>
                                 <div className="mt-4 flex items-baseline gap-2">
                                     <span className="text-4xl font-extrabold text-slate-950">{analyticsData.totalEvaluations}</span>
-                                    <span className="text-sm text-slate-400">pesquisas</span>
+                                    <span className="text-sm text-slate-400">({analyticsData.participationRate}%)</span>
                                 </div>
                                 <div className="mt-4 text-xs text-slate-500 flex items-center gap-1.5">
                                     <FaSmile className="text-emerald-500 shrink-0" />
