@@ -993,13 +993,13 @@ const GraficosPage = () => {
                                                     : 'bg-emerald-50/25 border-emerald-100'
                                             }`}
                                         >
-                                            {/* Document link on hover */}
+                                            {/* Document link */}
                                             <a
                                                 href={f.viewUrl}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 title="Abrir pedido no DocuWare Viewer"
-                                                className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-white rounded-xl shadow-sm text-slate-600 hover:text-indigo-600 hover:shadow"
+                                                className="absolute top-4 right-4 p-2 bg-white rounded-xl shadow-sm text-slate-600 hover:text-indigo-600 hover:shadow transition-all border border-slate-100"
                                             >
                                                 <FaExternalLinkAlt className="text-xs" />
                                             </a>
