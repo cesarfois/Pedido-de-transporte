@@ -49,6 +49,11 @@ const GraficosPage = () => {
     const [activePillarDetail, setActivePillarDetail] = useState(null); // Selected pillar for modal analysis
     const [showTableLegend, setShowTableLegend] = useState(false); // Toggle explanation legend
 
+    // Detailed analysis states
+    const [selectedGroup, setSelectedGroup] = useState(null); // 'critico', 'atencao', 'satisfatorio', or null
+    const [detailSearchQuery, setDetailSearchQuery] = useState('');
+    const [detailSortOrder, setDetailSortOrder] = useState('pior'); // 'pior', 'melhor', 'recente'
+
     // Historical data states (Lazy loaded)
     const [historicalDocs, setHistoricalDocs] = useState([]);
     const [historicalLoading, setHistoricalLoading] = useState(false);
@@ -388,6 +393,39 @@ const GraficosPage = () => {
                 return a.rating - b.rating;
             });
 
+        // Grouping for detailed analysis
+        const criticoRequests = [];
+        const atencaoRequests = [];
+        const satisfatorioRequests = [];
+
+        evaluatedRequests.forEach(r => {
+            if (r.averageRating >= 1.0 && r.averageRating <= 2.0) {
+                criticoRequests.push(r);
+            } else if (r.averageRating > 2.0 && r.averageRating <= 3.0) {
+                atencaoRequests.push(r);
+            } else if (r.averageRating > 3.0 && r.averageRating <= 5.0) {
+                satisfatorioRequests.push(r);
+            }
+        });
+
+        const getGroupStats = (list) => {
+            const count = list.length;
+            const avg = count > 0 ? list.reduce((sum, r) => sum + r.averageRating, 0) / count : 0;
+            const commentsCount = list.filter(r => r.comment.trim() !== '').length;
+            return {
+                count,
+                avg: parseFloat(avg.toFixed(2)),
+                commentsCount,
+                items: list
+            };
+        };
+
+        const groups = {
+            critico: getGroupStats(criticoRequests),
+            atencao: getGroupStats(atencaoRequests),
+            satisfatorio: getGroupStats(satisfatorioRequests)
+        };
+
         return {
             totalEvaluations: total,
             totalDocs,
@@ -400,7 +438,8 @@ const GraficosPage = () => {
             deptRanking,
             feedbacks,
             pillarsAverages,
-            rawEvaluations: evaluatedRequests
+            rawEvaluations: evaluatedRequests,
+            groups
         };
     }, [rawDocs]);
 
@@ -649,6 +688,7 @@ const GraficosPage = () => {
                     { id: 'drivers', label: 'Avaliação Motorista' },
                     { id: 'departments', label: 'Avaliação por Departamento' },
                     { id: 'feedback', label: 'Feedback dos Usuários' },
+                    { id: 'detailed', label: 'Análise Detalhada' },
                     { id: 'timeline', label: 'Evolução Temporal' }
                 ].map(tab => (
                     <button
@@ -1232,6 +1272,271 @@ const GraficosPage = () => {
                                             Nenhum dado encontrado para traçar o histórico mensal de satisfação.
                                         </div>
                                     )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 'detailed' && (
+                        <div className="space-y-8 animate-fade-in text-left">
+                            {/* Detailed Requests Group Summary Table Card */}
+                            <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-4">
+                                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                    <FaBuilding className="text-indigo-500" />
+                                    Análise Detalhada dos Pedidos (Agrupamento por Satisfação)
+                                </h3>
+                                <p className="text-sm text-slate-500">
+                                    Os pedidos são agrupados automaticamente de acordo com a média ponderada de satisfação recebida na pesquisa de satisfação.
+                                </p>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm text-left table-auto">
+                                        <thead>
+                                            <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs whitespace-nowrap">
+                                                <th className="py-3 pr-4">Grupo de Avaliação</th>
+                                                <th className="py-3 px-3 text-center">Quantidade de Pedidos</th>
+                                                <th className="py-3 px-3 text-center">Média do Grupo</th>
+                                                <th className="py-3 px-3 text-center">Comentários Registrados</th>
+                                                <th className="py-3 px-3 text-right">Ação</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50 text-slate-700">
+                                            {/* Critical Group */}
+                                            <tr className={`hover:bg-slate-50/50 transition-colors ${selectedGroup === 'critico' ? 'bg-rose-50/30' : ''}`}>
+                                                <td className="py-3.5 pr-4 font-semibold text-slate-950 flex items-center gap-2">
+                                                    <span className="w-3 h-3 rounded-full bg-rose-500"></span>
+                                                    <span>Crítico ⭐ 1-2</span>
+                                                </td>
+                                                <td className="py-3.5 px-3 text-center font-semibold">{analyticsData.groups.critico.count}</td>
+                                                <td className="py-3.5 px-3 text-center font-bold text-rose-600">{analyticsData.groups.critico.avg > 0 ? `${analyticsData.groups.critico.avg} ★` : '-'}</td>
+                                                <td className="py-3.5 px-3 text-center text-slate-500">{analyticsData.groups.critico.commentsCount}</td>
+                                                <td className="py-3.5 px-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedGroup(selectedGroup === 'critico' ? null : 'critico');
+                                                            setDetailSearchQuery('');
+                                                        }}
+                                                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                                                            selectedGroup === 'critico'
+                                                                ? 'bg-rose-600 text-white hover:bg-rose-700'
+                                                                : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                                        }`}
+                                                    >
+                                                        {selectedGroup === 'critico' ? 'Fechar' : 'Visualizar Pedidos'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+
+                                            {/* Attention Group */}
+                                            <tr className={`hover:bg-slate-50/50 transition-colors ${selectedGroup === 'atencao' ? 'bg-amber-50/30' : ''}`}>
+                                                <td className="py-3.5 pr-4 font-semibold text-slate-950 flex items-center gap-2">
+                                                    <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                                                    <span>Atenção ⭐ 2-3</span>
+                                                </td>
+                                                <td className="py-3.5 px-3 text-center font-semibold">{analyticsData.groups.atencao.count}</td>
+                                                <td className="py-3.5 px-3 text-center font-bold text-amber-600">{analyticsData.groups.atencao.avg > 0 ? `${analyticsData.groups.atencao.avg} ★` : '-'}</td>
+                                                <td className="py-3.5 px-3 text-center text-slate-500">{analyticsData.groups.atencao.commentsCount}</td>
+                                                <td className="py-3.5 px-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedGroup(selectedGroup === 'atencao' ? null : 'atencao');
+                                                            setDetailSearchQuery('');
+                                                        }}
+                                                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                                                            selectedGroup === 'atencao'
+                                                                ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                                                : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                                        }`}
+                                                    >
+                                                        {selectedGroup === 'atencao' ? 'Fechar' : 'Visualizar Pedidos'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+
+                                            {/* Satisfactory Group */}
+                                            <tr className={`hover:bg-slate-50/50 transition-colors ${selectedGroup === 'satisfatorio' ? 'bg-emerald-50/30' : ''}`}>
+                                                <td className="py-3.5 pr-4 font-semibold text-slate-950 flex items-center gap-2">
+                                                    <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                                                    <span>Satisfatório ⭐ 3-5</span>
+                                                </td>
+                                                <td className="py-3.5 px-3 text-center font-semibold">{analyticsData.groups.satisfatorio.count}</td>
+                                                <td className="py-3.5 px-3 text-center font-bold text-emerald-600">{analyticsData.groups.satisfatorio.avg > 0 ? `${analyticsData.groups.satisfatorio.avg} ★` : '-'}</td>
+                                                <td className="py-3.5 px-3 text-center text-slate-500">{analyticsData.groups.satisfatorio.commentsCount}</td>
+                                                <td className="py-3.5 px-3 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setSelectedGroup(selectedGroup === 'satisfatorio' ? null : 'satisfatorio');
+                                                            setDetailSearchQuery('');
+                                                        }}
+                                                        className={`px-4 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+                                                            selectedGroup === 'satisfatorio'
+                                                                ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                                                                : 'bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100'
+                                                        }`}
+                                                    >
+                                                        {selectedGroup === 'satisfatorio' ? 'Fechar' : 'Visualizar Pedidos'}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Detailed Requests Grid View (Dynamic under selectedGroup) */}
+                            {selectedGroup && (
+                                <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm space-y-6 animate-fade-in">
+                                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                        <div>
+                                            <h4 className="text-md font-bold text-slate-900 flex items-center gap-2">
+                                                <span>Pedidos do Grupo:</span>
+                                                <span className={`px-2.5 py-0.5 rounded-lg text-xs font-extrabold ${
+                                                    selectedGroup === 'critico' ? 'bg-rose-100 text-rose-800' :
+                                                    selectedGroup === 'atencao' ? 'bg-amber-100 text-amber-800' :
+                                                    'bg-emerald-100 text-emerald-800'
+                                                }`}>
+                                                    {selectedGroup === 'critico' ? 'Crítico ⭐ 1-2' :
+                                                     selectedGroup === 'atencao' ? 'Atenção ⭐ 2-3' : 'Satisfatório ⭐ 3-5'}
+                                                </span>
+                                            </h4>
+                                            <p className="text-xs text-slate-500 mt-1">
+                                                Exibindo {
+                                                    analyticsData.groups[selectedGroup].items.filter(item => {
+                                                        const q = detailSearchQuery.toLowerCase().trim();
+                                                        if (!q) return true;
+                                                        return (item.driver || '').toLowerCase().includes(q) ||
+                                                               (item.requester || '').toLowerCase().includes(q) ||
+                                                               (item.department || '').toLowerCase().includes(q);
+                                                    }).length
+                                                } pedidos com base no filtro de busca
+                                            </p>
+                                        </div>
+
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            {/* Search box */}
+                                            <div className="relative">
+                                                <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                                                    <FaSearch className="text-xs" />
+                                                </span>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Buscar por motorista, requerente..."
+                                                    value={detailSearchQuery}
+                                                    onChange={(e) => setDetailSearchQuery(e.target.value)}
+                                                    className="input input-sm input-bordered bg-white border-slate-200 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-slate-700 font-semibold shadow-sm w-64 h-9 pl-9 text-xs"
+                                                />
+                                            </div>
+
+                                            {/* Sort Select */}
+                                            <select
+                                                value={detailSortOrder}
+                                                onChange={(e) => setDetailSortOrder(e.target.value)}
+                                                className="select select-sm select-bordered bg-white border-slate-200 focus:border-indigo-500 rounded-xl text-slate-700 font-semibold shadow-sm text-xs h-9"
+                                            >
+                                                <option value="pior">Pior Avaliação Primeiro</option>
+                                                <option value="melhor">Melhor Avaliação Primeiro</option>
+                                                <option value="recente">Mais Recentes</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    {/* Detailed Table Grid */}
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-xs text-left table-auto">
+                                            <thead>
+                                                <tr className="border-b border-slate-100 text-slate-400 font-semibold uppercase tracking-wider text-[10px] whitespace-nowrap">
+                                                    <th className="py-3 pr-2">Nº Pedido</th>
+                                                    <th className="py-3 px-2">Data Pedido</th>
+                                                    <th className="py-3 px-2">Requerente</th>
+                                                    <th className="py-3 px-2">Departamento</th>
+                                                    <th className="py-3 px-2">Motorista</th>
+                                                    <th className="py-3 px-2 text-center">Média</th>
+                                                    <th className="py-3 px-1 text-center">Atraso</th>
+                                                    <th className="py-3 px-1 text-center">Comp.</th>
+                                                    <th className="py-3 px-1 text-center">Cond.</th>
+                                                    <th className="py-3 px-1 text-center">Veículo</th>
+                                                    <th className="py-3 px-2">Comentário</th>
+                                                    <th className="py-3 px-2 text-right">Ação</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50 text-slate-700">
+                                                {analyticsData.groups[selectedGroup].items
+                                                    .filter(item => {
+                                                        const q = detailSearchQuery.toLowerCase().trim();
+                                                        if (!q) return true;
+                                                        return (item.driver || '').toLowerCase().includes(q) ||
+                                                               (item.requester || '').toLowerCase().includes(q) ||
+                                                               (item.department || '').toLowerCase().includes(q);
+                                                    })
+                                                    .sort((a, b) => {
+                                                        if (detailSortOrder === 'pior') {
+                                                            return a.averageRating - b.averageRating;
+                                                        } else if (detailSortOrder === 'melhor') {
+                                                            return b.averageRating - a.averageRating;
+                                                        } else {
+                                                            const dateA = a.date ? a.date.getTime() : 0;
+                                                            const dateB = b.date ? b.date.getTime() : 0;
+                                                            return dateB - dateA;
+                                                        }
+                                                    })
+                                                    .map((item, idx) => (
+                                                        <tr key={idx} className="hover:bg-slate-50/50 transition-colors whitespace-nowrap text-slate-600">
+                                                            <td className="py-3 pr-2 font-bold text-slate-900">#{item.id}</td>
+                                                            <td className="py-3 px-2 font-medium">{item.date ? item.date.toLocaleDateString('pt-BR') : '-'}</td>
+                                                            <td className="py-3 px-2 truncate max-w-[120px]" title={item.requester}>{item.requester.split('@')[0]}</td>
+                                                            <td className="py-3 px-2 truncate max-w-[120px]" title={item.department}>{item.department}</td>
+                                                            <td className="py-3 px-2 font-semibold text-slate-800">{item.driver}</td>
+                                                            <td className="py-3 px-2 text-center">
+                                                                <span className={`px-2 py-0.5 rounded font-extrabold text-[10px] ${
+                                                                    item.averageRating >= 3.8 ? 'bg-emerald-50 text-emerald-700' :
+                                                                    item.averageRating >= 2.8 ? 'bg-amber-50 text-amber-700' :
+                                                                    'bg-rose-50 text-rose-700'
+                                                                }`}>
+                                                                    {item.averageRating.toFixed(2)} ★
+                                                                </span>
+                                                            </td>
+                                                            {[
+                                                                item.ratings.atraso,
+                                                                item.ratings.comportamento,
+                                                                item.ratings.conducao,
+                                                                item.ratings.estadoVeiculo
+                                                            ].map((val, valIdx) => (
+                                                                <td key={valIdx} className="py-3 px-1 text-center font-bold">
+                                                                    {val !== null ? `${val} ★` : <span className="text-slate-300 font-normal">-</span>}
+                                                                </td>
+                                                            ))}
+                                                            <td className="py-3 px-2 whitespace-normal break-words max-w-[200px] italic" title={item.comment}>
+                                                                {item.comment.trim() !== '' ? `"${item.comment}"` : <span className="text-slate-300 font-normal">Sem comentário</span>}
+                                                            </td>
+                                                            <td className="py-3 px-2 text-right">
+                                                                <a
+                                                                    href={item.viewUrl}
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                    className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-all border border-indigo-200/45"
+                                                                >
+                                                                    <span>Abrir Documento</span>
+                                                                    <FaExternalLinkAlt className="text-[8px]" />
+                                                                </a>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                {analyticsData.groups[selectedGroup].items.filter(item => {
+                                                    const q = detailSearchQuery.toLowerCase().trim();
+                                                    if (!q) return true;
+                                                    return (item.driver || '').toLowerCase().includes(q) ||
+                                                           (item.requester || '').toLowerCase().includes(q) ||
+                                                           (item.department || '').toLowerCase().includes(q);
+                                                }).length === 0 && (
+                                                    <tr>
+                                                        <td colSpan={12} className="py-8 text-center text-slate-400 font-medium">Nenhum pedido encontrado com os filtros atuais.</td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                         </div>
