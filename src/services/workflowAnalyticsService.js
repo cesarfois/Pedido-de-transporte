@@ -10,7 +10,7 @@ import axios from 'axios';
  */
 
 const analyticsApi = axios.create({
-    baseURL: '/DocuWare/Workflow/Analytics', // Removed '/api' which is likely incorrect
+    baseURL: (import.meta.env.BASE_URL || '/') + 'DocuWare/Workflow/Analytics',
     timeout: 8000,
     headers: {
         'Accept': 'application/json',
@@ -92,8 +92,7 @@ export const workflowAnalyticsService = {
                 return [];
             }
 
-            const response = await analyticsApi.get('/DocuWare/Platform/Workflow/Instances/DocumentHistory', {
-                baseURL: '/',
+            const response = await analyticsApi.get(`${import.meta.env.BASE_URL || '/'}DocuWare/Platform/Workflow/Instances/DocumentHistory`, {
                 params: {
                     fileCabinetId: cabinetId,
                     documentId: docId
@@ -117,15 +116,16 @@ export const workflowAnalyticsService = {
 
                         if (selfLink && selfLink.href) {
                             historyUrl = selfLink.href;
+                            if (historyUrl.startsWith('/DocuWare')) {
+                                historyUrl = (import.meta.env.BASE_URL || '/') + historyUrl.substring(1);
+                            }
                         } else {
-                            // Fallback construction if link missing
-                            // /DocuWare/Platform/Workflow/Workflows/{WorkflowId}/Instances/{Id}/History
-                            historyUrl = `/DocuWare/Platform/Workflow/Workflows/${inst.WorkflowId}/Instances/${inst.Id}/History`;
+                            historyUrl = `${import.meta.env.BASE_URL || '/'}DocuWare/Platform/Workflow/Workflows/${inst.WorkflowId}/Instances/${inst.Id}/History`;
                         }
 
                         if (historyUrl) {
                             console.log(`[WorkflowAnalytics] Fetching details: ${historyUrl}`);
-                            const detailResp = await analyticsApi.get(historyUrl, { baseURL: '/' });
+                            const detailResp = await analyticsApi.get(historyUrl);
                             // Attach steps to the instance object, DO NOT flatten yet
                             return {
                                 ...inst,
@@ -211,8 +211,7 @@ export const workflowAnalyticsService = {
             if (workflowName) {
                 params.name = workflowName;
             }
-            const response = await analyticsApi.get(`/api/wfd/${workflowId}`, { 
-                baseURL: '/',
+            const response = await analyticsApi.get(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`, { 
                 params
             });
             return response.data;
@@ -227,7 +226,7 @@ export const workflowAnalyticsService = {
      */
     saveWfdDefinition: async (workflowId, definition) => {
         try {
-            await analyticsApi.post(`/api/wfd/${workflowId}`, definition, { baseURL: '/' });
+            await analyticsApi.post(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`, definition);
             return true;
         } catch (err) {
             console.error(`[WorkflowAnalytics] Failed to save WFD to server for ${workflowId}:`, err);
@@ -240,7 +239,7 @@ export const workflowAnalyticsService = {
      */
     deleteWfdDefinition: async (workflowId) => {
         try {
-            await analyticsApi.delete(`/api/wfd/${workflowId}`, { baseURL: '/' });
+            await analyticsApi.delete(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`);
             return true;
         } catch (err) {
             console.error(`[WorkflowAnalytics] Failed to delete WFD from server for ${workflowId}:`, err);
