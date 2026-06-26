@@ -93,6 +93,7 @@ export const workflowAnalyticsService = {
             }
 
             const response = await analyticsApi.get(`${import.meta.env.BASE_URL || '/'}DocuWare/Platform/Workflow/Instances/DocumentHistory`, {
+                baseURL: '/',
                 params: {
                     fileCabinetId: cabinetId,
                     documentId: docId
@@ -125,7 +126,7 @@ export const workflowAnalyticsService = {
 
                         if (historyUrl) {
                             console.log(`[WorkflowAnalytics] Fetching details: ${historyUrl}`);
-                            const detailResp = await analyticsApi.get(historyUrl);
+                            const detailResp = await analyticsApi.get(historyUrl, { baseURL: '/' });
                             // Attach steps to the instance object, DO NOT flatten yet
                             return {
                                 ...inst,
@@ -212,6 +213,7 @@ export const workflowAnalyticsService = {
                 params.name = workflowName;
             }
             const response = await analyticsApi.get(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`, { 
+                baseURL: '/',
                 params
             });
             return response.data;
@@ -226,7 +228,7 @@ export const workflowAnalyticsService = {
      */
     saveWfdDefinition: async (workflowId, definition) => {
         try {
-            await analyticsApi.post(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`, definition);
+            await analyticsApi.post(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`, definition, { baseURL: '/' });
             return true;
         } catch (err) {
             console.error(`[WorkflowAnalytics] Failed to save WFD to server for ${workflowId}:`, err);
@@ -239,7 +241,7 @@ export const workflowAnalyticsService = {
      */
     deleteWfdDefinition: async (workflowId) => {
         try {
-            await analyticsApi.delete(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`);
+            await analyticsApi.delete(`${import.meta.env.BASE_URL || '/'}api/wfd/${workflowId}`, { baseURL: '/' });
             return true;
         } catch (err) {
             console.error(`[WorkflowAnalytics] Failed to delete WFD from server for ${workflowId}:`, err);
